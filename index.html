@@ -588,6 +588,29 @@
     return '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
   }
 
+  function parseTimeToMinutes(str) {
+    if (!str) return null;
+    const m = str.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+    if (!m) return null;
+    let h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    const ap = (m[3] || "").toLowerCase();
+    if (ap === "pm" && h !== 12) h += 12;
+    if (ap === "am" && h === 12) h = 0;
+    return h * 60 + min;
+  }
+
+  function sortBlockByTime(block) {
+    block.items.sort((a, b) => {
+      const ta = parseTimeToMinutes(a.time);
+      const tb = parseTimeToMinutes(b.time);
+      if (ta === null && tb === null) return 0;
+      if (ta === null) return 1;
+      if (tb === null) return -1;
+      return ta - tb;
+    });
+  }
+
   function openModal(ctx) {
     modalCtx = ctx;
     if (ctx.isNew) {
@@ -624,6 +647,7 @@
       item.t = title;
       item.time = time;
     }
+    sortBlockByTime(quests[modalCtx.blockIdx]);
     saveQuests(quests);
     totalCount = quests.reduce((n, b) => n + b.items.length, 0);
     closeModal();
