@@ -235,6 +235,54 @@
     font-size: 13px;
   }
 
+  /* protected-type activity: same locked look, but lives in the normal card flow so it's editable */
+  .card.type-protegida {
+    background: var(--bg-elev);
+    border-style: dashed;
+    cursor: default;
+  }
+  .card.type-protegida .card-title { color: var(--gold); font-weight: 500; }
+  .card.type-protegida .card-time { color: var(--gold-dim); }
+  .card.type-protegida .box {
+    border-color: var(--gold-dim);
+    color: var(--gold);
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  .card.type-protegida .box svg { display: none; }
+  .card.type-protegida:not(.editmode) .box::after { content: "∞"; }
+
+  /* one-off / unforeseen activity */
+  .card.type-imprevisto {
+    border-style: dashed;
+    border-color: var(--danger);
+  }
+  .card.type-imprevisto .card-title::before {
+    content: "✦ ";
+    color: var(--danger);
+  }
+
+  .type-select {
+    display: flex;
+    gap: 6px;
+  }
+  .type-btn {
+    flex: 1;
+    padding: 9px 4px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-elev);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .type-btn.active {
+    border-color: var(--gold-dim);
+    color: var(--gold);
+    background: rgba(224,176,78,0.08);
+  }
+
   footer {
     margin-top: 28px;
     text-align: center;
@@ -417,6 +465,69 @@
   .history-cell.complete { background: var(--teal); border-color: var(--teal); color: #0c1613; }
   .history-cell.partial { background: var(--gold-dim); border-color: var(--gold-dim); color: #23190a; }
   .history-cell.today { border-color: var(--gold); border-width: 1.5px; }
+
+  .history-head-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .cal-toggle {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-faint);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 3px 10px;
+    cursor: pointer;
+  }
+  .cal-toggle.active { color: var(--gold); border-color: var(--gold-dim); }
+
+  .calendar { display: none; margin-top: 14px; }
+  .calendar.show { display: block; }
+  .cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .cal-nav button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    border-radius: 6px;
+    width: 26px; height: 26px;
+    cursor: pointer;
+  }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+  }
+  .cal-dow {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-faint);
+    padding-bottom: 2px;
+  }
+  .cal-cell {
+    aspect-ratio: 1;
+    border-radius: 6px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-faint);
+  }
+  .cal-cell.empty { background: none; border: none; }
+  .cal-cell.complete { background: var(--teal); border-color: var(--teal); color: #0c1613; }
+  .cal-cell.partial { background: var(--gold-dim); border-color: var(--gold-dim); color: #23190a; }
+  .cal-cell.today { border-color: var(--gold); border-width: 1.5px; }
 </style>
 </head>
 <body>
@@ -442,8 +553,19 @@
   <div id="blocks"></div>
 
   <div class="history">
-    <div class="history-head">ÚLTIMOS 7 DÍAS</div>
+    <div class="history-head-row">
+      <div class="history-head">ÚLTIMOS 7 DÍAS</div>
+      <button class="cal-toggle" id="calToggle">ver mes ▾</button>
+    </div>
     <div class="history-row" id="historyRow"></div>
+    <div class="calendar" id="calendar">
+      <div class="cal-nav">
+        <button id="calPrev">‹</button>
+        <span id="calLabel">—</span>
+        <button id="calNext">›</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
   </div>
 
   <footer>
@@ -457,12 +579,24 @@
   <div class="modal">
     <h3 id="modalTitle">Editar actividad</h3>
     <div class="field">
+      <label>Tipo</label>
+      <div class="type-select" id="typeSelect">
+        <button type="button" class="type-btn" data-type="normal">Normal</button>
+        <button type="button" class="type-btn" data-type="protegida">Protegida</button>
+        <button type="button" class="type-btn" data-type="imprevisto">Imprevisto</button>
+      </div>
+    </div>
+    <div class="field">
       <label>Actividad</label>
       <input type="text" id="fieldTitle" placeholder="Ej. Estirar 10 min">
     </div>
     <div class="field">
       <label>Hora (opcional)</label>
-      <input type="text" id="fieldTime" placeholder="Ej. 7:00 am">
+      <input type="time" id="fieldTime">
+    </div>
+    <div class="field">
+      <label>Nota (opcional)</label>
+      <input type="text" id="fieldNote" placeholder="Ej. hasta las 7:30, antes de esta hora...">
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" id="modalCancel">Cancelar</button>
@@ -478,26 +612,27 @@
 (function () {
   const DEFAULT_QUESTS = [
     { block: "MAÑANA", glyph: "☀", items: [
-      { id: "wake", t: "Despertar", time: "6:00 am" },
-      { id: "water", t: "Agua + unos minutos de luz/aire libre", time: "6:05 am" },
-      { id: "pre", t: "Snack pre-gym (plátano o pan con miel)", time: "6:15 am" },
-      { id: "gym", t: "Entrenar pesado", time: "6:30 – 7:30 am" },
-      { id: "post", t: "Comida fuerte post-gym", time: "7:45 am" },
+      { id: "wake", t: "Despertar", time: "06:00", note: "", type: "normal" },
+      { id: "water", t: "Agua + unos minutos de luz/aire libre", time: "06:05", note: "", type: "normal" },
+      { id: "pre", t: "Snack pre-gym (plátano o pan con miel)", time: "06:15", note: "", type: "normal" },
+      { id: "gym", t: "Entrenar pesado", time: "06:30", note: "hasta las 7:30 am", type: "normal" },
+      { id: "post", t: "Comida fuerte post-gym", time: "07:45", note: "", type: "normal" },
     ]},
     { block: "DÍA", glyph: "◆", items: [
-      { id: "moves", t: "Pausas activas cada 1–2 horas", time: "" },
-      { id: "lunch", t: "Comida del mediodía (proteína + verdura)", time: "" },
-      { id: "walk", t: "Caminata", time: "" },
+      { id: "moves", t: "Pausas activas cada 1–2 horas", time: "", note: "", type: "normal" },
+      { id: "lunch", t: "Comida del mediodía (proteína + verdura)", time: "", note: "", type: "normal" },
+      { id: "walk", t: "Caminata", time: "", note: "", type: "normal" },
     ]},
     { block: "TARDE", glyph: "◐", items: [
-      { id: "dinner", t: "Cena ligera", time: "antes de 6:00 pm" },
+      { id: "dinner", t: "Cena ligera", time: "17:30", note: "antes de las 6:00 pm", type: "normal" },
+      { id: "zone", t: "Videojuegos / llamada con amigos", time: "18:00", note: "hasta 11–12 pm", type: "protegida" },
     ]},
     { block: "NOCHE", glyph: "☾", items: [
-      { id: "sleep", t: "Dormir", time: "" },
+      { id: "sleep", t: "Dormir", time: "", note: "", type: "normal" },
     ]},
   ];
 
-  const ZONE = { t: "Videojuegos / llamada con amigos", time: "6:00 pm – 11:00–12:00 am", glyph: "★" };
+  function makeId() { return "q" + Date.now() + Math.floor(Math.random() * 1000); }
 
   const todayKey = () => new Date().toISOString().slice(0, 10);
   const QUESTS_KEY = "quest-log-quests";
@@ -513,10 +648,42 @@
     try { localStorage.setItem(key, val); } catch (e) {}
   }
 
+  function legacyParseToMinutes(str) {
+    if (!str) return null;
+    const m = str.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+    if (!m) return null;
+    let h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    const ap = (m[3] || "").toLowerCase();
+    if (ap === "pm" && h !== 12) h += 12;
+    if (ap === "am" && h === 12) h = 0;
+    return h * 60 + min;
+  }
+  function minutesTo24(mins) {
+    const h = Math.floor(mins / 60), m = mins % 60;
+    return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+  }
+  function migrateItem(item) {
+    if (!item.type) item.type = "normal";
+    if (item.note === undefined) item.note = "";
+    // already migrated (24h HH:MM or empty)
+    if (item.time === "" || /^\d{2}:\d{2}$/.test(item.time)) return item;
+    // old free-text time like "6:15 am" or "antes de 6:00 pm"
+    const mins = legacyParseToMinutes(item.time);
+    const original = item.time;
+    item.time = mins !== null ? minutesTo24(mins) : "";
+    if (!item.note) item.note = original;
+    return item;
+  }
+  function migrateQuests(q) {
+    q.forEach(block => { block.items = block.items.map(migrateItem); });
+    return q;
+  }
+
   function loadQuests() {
     const raw = safeGet(QUESTS_KEY);
     if (!raw) return JSON.parse(JSON.stringify(DEFAULT_QUESTS));
-    try { return JSON.parse(raw); } catch (e) { return JSON.parse(JSON.stringify(DEFAULT_QUESTS)); }
+    try { return migrateQuests(JSON.parse(raw)); } catch (e) { return JSON.parse(JSON.stringify(DEFAULT_QUESTS)); }
   }
   function saveQuests(q) { safeSet(QUESTS_KEY, JSON.stringify(q)); }
 
@@ -567,7 +734,7 @@
   }
 
   let quests = loadQuests();
-  let totalCount = quests.reduce((n, b) => n + b.items.length, 0);
+  let totalCount = quests.reduce((n, b) => n + b.items.filter(i => i.type !== "protegida").length, 0);
   let state = loadState(totalCount);
   let editMode = false;
 
@@ -590,14 +757,18 @@
 
   function parseTimeToMinutes(str) {
     if (!str) return null;
-    const m = str.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+    const m = str.match(/^(\d{2}):(\d{2})$/);
     if (!m) return null;
-    let h = parseInt(m[1], 10);
-    const min = parseInt(m[2], 10);
-    const ap = (m[3] || "").toLowerCase();
-    if (ap === "pm" && h !== 12) h += 12;
-    if (ap === "am" && h === 12) h = 0;
-    return h * 60 + min;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
+
+  function formatTimeDisplay(hhmm) {
+    if (!hhmm) return "";
+    const [hStr, mStr] = hhmm.split(":");
+    let h = parseInt(hStr, 10);
+    const ap = h >= 12 ? "pm" : "am";
+    h = h % 12; if (h === 0) h = 12;
+    return `${h}:${mStr} ${ap}`;
   }
 
   function sortBlockByTime(block) {
@@ -611,20 +782,36 @@
     });
   }
 
+  const fieldNote = document.getElementById("fieldNote");
+  const typeSelect = document.getElementById("typeSelect");
+  let selectedType = "normal";
+
+  typeSelect.querySelectorAll(".type-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectedType = btn.dataset.type;
+      typeSelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b === btn));
+    });
+  });
+
   function openModal(ctx) {
     modalCtx = ctx;
     if (ctx.isNew) {
       modalTitle.textContent = "Nueva actividad";
       fieldTitle.value = "";
       fieldTime.value = "";
+      fieldNote.value = "";
+      selectedType = "normal";
       modalDeleteRow.style.display = "none";
     } else {
       const item = quests[ctx.blockIdx].items[ctx.itemIdx];
       modalTitle.textContent = "Editar actividad";
       fieldTitle.value = item.t;
       fieldTime.value = item.time || "";
+      fieldNote.value = item.note || "";
+      selectedType = item.type || "normal";
       modalDeleteRow.style.display = "flex";
     }
+    typeSelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b.dataset.type === selectedType));
     modalBackdrop.classList.add("show");
     setTimeout(() => fieldTitle.focus(), 50);
   }
@@ -638,18 +825,21 @@
   document.getElementById("modalSave").addEventListener("click", () => {
     const title = fieldTitle.value.trim();
     if (!title) { fieldTitle.focus(); return; }
-    const time = fieldTime.value.trim();
+    const time = fieldTime.value; // already HH:MM (24h) from the native picker, or ""
+    const note = fieldNote.value.trim();
     if (modalCtx.isNew) {
-      const id = "q" + Date.now();
-      quests[modalCtx.blockIdx].items.push({ id, t: title, time });
+      const id = makeId();
+      quests[modalCtx.blockIdx].items.push({ id, t: title, time, note, type: selectedType });
     } else {
       const item = quests[modalCtx.blockIdx].items[modalCtx.itemIdx];
       item.t = title;
       item.time = time;
+      item.note = note;
+      item.type = selectedType;
     }
     sortBlockByTime(quests[modalCtx.blockIdx]);
     saveQuests(quests);
-    totalCount = quests.reduce((n, b) => n + b.items.length, 0);
+    totalCount = quests.reduce((n, b) => n + b.items.filter(i => i.type !== "protegida").length, 0);
     closeModal();
     render();
   });
@@ -660,7 +850,7 @@
     delete state.done[item.id];
     saveQuests(quests);
     saveState(state);
-    totalCount = quests.reduce((n, b) => n + b.items.length, 0);
+    totalCount = quests.reduce((n, b) => n + b.items.filter(i => i.type !== "protegida").length, 0);
     closeModal();
     render();
   });
@@ -679,17 +869,25 @@
       blockEl.appendChild(head);
 
       block.items.forEach((item, iIdx) => {
-        total++;
+        const isProtected = item.type === "protegida";
+        if (!isProtected) total++;
         const isDone = !!state.done[item.id];
-        if (isDone) done++;
+        if (!isProtected && isDone) done++;
+
+        const timeLabel = formatTimeDisplay(item.time);
+        const timeLine = [timeLabel, item.note].filter(Boolean).join(" · ");
 
         const card = document.createElement("div");
-        card.className = "card" + (isDone ? " done" : "") + (editMode ? " editmode" : "");
+        card.className = "card"
+          + (isDone && !isProtected ? " done" : "")
+          + (editMode ? " editmode" : "")
+          + (item.type === "protegida" ? " type-protegida" : "")
+          + (item.type === "imprevisto" ? " type-imprevisto" : "");
         card.innerHTML = `
-          <div class="box">${checkIcon()}</div>
+          <div class="box">${isProtected ? "" : checkIcon()}</div>
           <div class="card-body">
             <div class="card-title">${item.t}</div>
-            ${item.time ? `<div class="card-time">${item.time}</div>` : ""}
+            ${timeLine ? `<div class="card-time">${timeLine}</div>` : ""}
           </div>
           <div class="card-actions">
             <button class="icon-btn edit-item" aria-label="Editar">✎</button>
@@ -700,6 +898,7 @@
             if (e.target.closest(".edit-item")) openModal({ blockIdx: bIdx, itemIdx: iIdx });
             return;
           }
+          if (isProtected) return; // not toggleable
           state.done[item.id] = !state.done[item.id];
           state.date = todayKey();
           saveState(state);
@@ -715,22 +914,6 @@
       blockEl.appendChild(addRow);
 
       blocksEl.appendChild(blockEl);
-
-      if (block.block === "TARDE") {
-        const zoneEl = document.createElement("div");
-        zoneEl.className = "block";
-        zoneEl.innerHTML = `
-          <div class="block-head"><span class="glyph">${ZONE.glyph}</span><h2>ZONA PROTEGIDA</h2></div>
-          <div class="locked">
-            <div class="box">∞</div>
-            <div class="card-body">
-              <div class="card-title">${ZONE.t}</div>
-              <div class="card-time">${ZONE.time}</div>
-            </div>
-          </div>
-        `;
-        blocksEl.appendChild(zoneEl);
-      }
     });
 
     document.getElementById("progressLabel").textContent = `${done}/${total}`;
@@ -741,6 +924,7 @@
     document.getElementById("streakN").textContent = streak;
 
     renderHistory(done, total);
+    renderCalendar(done, total);
   }
 
   function renderHistory(todayDone, todayTotal) {
@@ -772,6 +956,75 @@
       row.appendChild(cell);
     });
   }
+
+  let calOpen = false;
+  let calCursor = new Date(); // month currently shown
+
+  function renderCalendar(todayDone, todayTotal) {
+    if (!calOpen) return;
+    const history = loadHistory();
+    const map = {};
+    history.forEach(h => { map[h.date] = h; });
+    map[todayKey()] = { done: todayDone, total: todayTotal };
+
+    const monthNames = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+    document.getElementById("calLabel").textContent = `${monthNames[calCursor.getMonth()]} ${calCursor.getFullYear()}`;
+
+    const grid = document.getElementById("calGrid");
+    grid.innerHTML = "";
+    ["D","L","M","M","J","V","S"].forEach(l => {
+      const dow = document.createElement("div");
+      dow.className = "cal-dow";
+      dow.textContent = l;
+      grid.appendChild(dow);
+    });
+
+    const year = calCursor.getFullYear(), month = calCursor.getMonth();
+    const firstDow = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    for (let i = 0; i < firstDow; i++) {
+      const empty = document.createElement("div");
+      empty.className = "cal-cell empty";
+      grid.appendChild(empty);
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateObj = new Date(year, month, d);
+      const key = dateObj.toISOString().slice(0, 10);
+      const entry = map[key];
+      const cell = document.createElement("div");
+      let cls = "cal-cell";
+      if (key === todayKey()) cls += " today";
+      if (entry && entry.total > 0) {
+        if (entry.done === entry.total) cls += " complete";
+        else if (entry.done > 0) cls += " partial";
+      }
+      cell.className = cls;
+      cell.textContent = d;
+      cell.title = entry ? `${key}: ${entry.done}/${entry.total}` : key;
+      grid.appendChild(cell);
+    }
+  }
+
+  document.getElementById("calToggle").addEventListener("click", (e) => {
+    calOpen = !calOpen;
+    e.currentTarget.classList.toggle("active", calOpen);
+    document.getElementById("calendar").classList.toggle("show", calOpen);
+    if (calOpen) {
+      const doneNow = Object.values(state.done).filter(Boolean).length;
+      renderCalendar(doneNow, totalCount);
+    }
+  });
+  document.getElementById("calPrev").addEventListener("click", () => {
+    calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() - 1, 1);
+    const doneNow = Object.values(state.done).filter(Boolean).length;
+    renderCalendar(doneNow, totalCount);
+  });
+  document.getElementById("calNext").addEventListener("click", () => {
+    calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() + 1, 1);
+    const doneNow = Object.values(state.done).filter(Boolean).length;
+    renderCalendar(doneNow, totalCount);
+  });
 
   document.getElementById("resetBtn").addEventListener("click", () => {
     state = { date: todayKey(), done: {} };
