@@ -354,6 +354,7 @@
     cursor: pointer;
   }
   .icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+  .icon-btn[disabled] { opacity: 0.3; cursor: default; }
 
   .add-row {
     display: none;
@@ -570,6 +571,7 @@
 
   <footer>
     <button class="reset-btn" id="resetBtn">reiniciar hoy</button>
+    <button class="reset-btn" id="copyYesterdayBtn" style="margin-left:8px;">marcar todo como ayer</button>
     <button class="reset-btn" id="exportBtn" style="margin-left:8px;">exportar historial (.csv)</button>
     <div class="date-note" id="dateNote"></div>
   </footer>
@@ -608,6 +610,16 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="weeklyBackdrop">
+  <div class="modal">
+    <h3>Resumen de la semana</h3>
+    <p id="weeklyText" style="color:var(--text-dim); font-size:14px; line-height:1.5; margin:0 0 16px;"></p>
+    <div class="modal-actions">
+      <button class="btn-save" id="weeklyClose" style="flex:1;">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   const DEFAULT_QUESTS = [
@@ -631,6 +643,19 @@
       { id: "sleep", t: "Dormir", time: "", note: "", type: "normal" },
     ]},
   ];
+
+  const BLOCK_RANGES = [
+    { from: 300, to: 719, label: "5:00 am – 12:00 pm" },   // MAÑANA
+    { from: 720, to: 959, label: "12:00 pm – 4:00 pm" },   // DÍA
+    { from: 960, to: 1199, label: "4:00 pm – 8:00 pm" },   // TARDE
+    { from: 1200, to: 299, label: "8:00 pm – 5:00 am" },   // NOCHE (wraps past midnight)
+  ];
+  function blockIdxForMinutes(mins) {
+    if (mins >= 300 && mins < 720) return 0;
+    if (mins >= 720 && mins < 960) return 1;
+    if (mins >= 960 && mins < 1200) return 2;
+    return 3; // 20:00–04:59
+  }
 
   function makeId() { return "q" + Date.now() + Math.floor(Math.random() * 1000); }
 
@@ -696,11 +721,11 @@
 
   function archiveIfNewDay(prevState, total) {
     if (!prevState || prevState.date === todayKey()) return;
-    const doneCount = Object.values(prevState.done || {}).filter(Boolean).length;
-    if (doneCount === 0) return; // nothing to log for an untouched day
+    const doneIds = Object.keys(prevState.done || {}).filter(k => prevState.done[k]);
+    if (doneIds.length === 0) return; // nothing to log for an untouched day
     const history = loadHistory();
     const existing = history.findIndex(h => h.date === prevState.date);
-    const entry = { date: prevState.date, done: doneCount, total };
+    const entry = { date: prevState.date, done: doneIds.length, total, doneIds };
     if (existing >= 0) history[existing] = entry; else history.push(entry);
     saveHistory(history);
   }
@@ -812,12 +837,14 @@
       modalDeleteRow.style.display = "flex";
     }
     typeSelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b.dataset.type === selectedType));
+    resetDeleteBtn();
     modalBackdrop.classList.add("show");
     setTimeout(() => fieldTitle.focus(), 50);
   }
   function closeModal() {
     modalBackdrop.classList.remove("show");
     modalCtx = null;
+    resetDeleteBtn();
   }
   document.getElementById("modalCancel").addEventListener("click", closeModal);
   modalBackdrop.addEventListener("click", (e) => { if (e.target === modalBackdrop) closeModal(); });
@@ -827,30 +854,52 @@
     if (!title) { fieldTitle.focus(); return; }
     const time = fieldTime.value; // already HH:MM (24h) from the native picker, or ""
     const note = fieldNote.value.trim();
+
+    let targetBlockIdx = modalCtx.blockIdx;
+    const mins = parseTimeToMinutes(time);
+    if (mins !== null) targetBlockIdx = blockIdxForMinutes(mins);
+
     if (modalCtx.isNew) {
       const id = makeId();
-      quests[modalCtx.blockIdx].items.push({ id, t: title, time, note, type: selectedType });
+      quests[targetBlockIdx].items.push({ id, t: title, time, note, type: selectedType });
     } else {
       const item = quests[modalCtx.blockIdx].items[modalCtx.itemIdx];
       item.t = title;
       item.time = time;
       item.note = note;
       item.type = selectedType;
+      if (targetBlockIdx !== modalCtx.blockIdx) {
+        quests[modalCtx.blockIdx].items.splice(modalCtx.itemIdx, 1);
+        quests[targetBlockIdx].items.push(item);
+      }
     }
-    sortBlockByTime(quests[modalCtx.blockIdx]);
+    sortBlockByTime(quests[targetBlockIdx]);
     saveQuests(quests);
     totalCount = quests.reduce((n, b) => n + b.items.filter(i => i.type !== "protegida").length, 0);
     closeModal();
     render();
   });
 
-  document.getElementById("modalDelete").addEventListener("click", () => {
+  const deleteBtn = document.getElementById("modalDelete");
+  let deleteArmed = false;
+  function resetDeleteBtn() {
+    deleteArmed = false;
+    deleteBtn.textContent = "Eliminar actividad";
+  }
+  deleteBtn.addEventListener("click", () => {
+    if (!deleteArmed) {
+      deleteArmed = true;
+      deleteBtn.textContent = "¿Seguro? Toca de nuevo";
+      setTimeout(() => { if (deleteArmed) resetDeleteBtn(); }, 4000);
+      return;
+    }
     const item = quests[modalCtx.blockIdx].items[modalCtx.itemIdx];
     quests[modalCtx.blockIdx].items.splice(modalCtx.itemIdx, 1);
     delete state.done[item.id];
     saveQuests(quests);
     saveState(state);
     totalCount = quests.reduce((n, b) => n + b.items.filter(i => i.type !== "protegida").length, 0);
+    resetDeleteBtn();
     closeModal();
     render();
   });
@@ -865,7 +914,7 @@
 
       const head = document.createElement("div");
       head.className = "block-head";
-      head.innerHTML = `<span class="glyph">${block.glyph}</span><h2>${block.block}</h2>`;
+      head.innerHTML = `<span class="glyph">${block.glyph}</span><h2>${block.block}</h2><span class="span">${BLOCK_RANGES[bIdx].label}</span>`;
       blockEl.appendChild(head);
 
       block.items.forEach((item, iIdx) => {
@@ -883,6 +932,9 @@
           + (editMode ? " editmode" : "")
           + (item.type === "protegida" ? " type-protegida" : "")
           + (item.type === "imprevisto" ? " type-imprevisto" : "");
+        const canReorder = !item.time;
+        const isFirst = iIdx === 0;
+        const isLast = iIdx === block.items.length - 1;
         card.innerHTML = `
           <div class="box">${isProtected ? "" : checkIcon()}</div>
           <div class="card-body">
@@ -890,12 +942,22 @@
             ${timeLine ? `<div class="card-time">${timeLine}</div>` : ""}
           </div>
           <div class="card-actions">
+            ${canReorder ? `<button class="icon-btn move-up" aria-label="Subir" ${isFirst ? "disabled" : ""}>▲</button>
+            <button class="icon-btn move-down" aria-label="Bajar" ${isLast ? "disabled" : ""}>▼</button>` : ""}
             <button class="icon-btn edit-item" aria-label="Editar">✎</button>
           </div>
         `;
         card.addEventListener("click", (e) => {
           if (editMode) {
-            if (e.target.closest(".edit-item")) openModal({ blockIdx: bIdx, itemIdx: iIdx });
+            if (e.target.closest(".edit-item")) { openModal({ blockIdx: bIdx, itemIdx: iIdx }); return; }
+            if (e.target.closest(".move-up") && !isFirst) {
+              [block.items[iIdx - 1], block.items[iIdx]] = [block.items[iIdx], block.items[iIdx - 1]];
+              saveQuests(quests); render(); return;
+            }
+            if (e.target.closest(".move-down") && !isLast) {
+              [block.items[iIdx + 1], block.items[iIdx]] = [block.items[iIdx], block.items[iIdx + 1]];
+              saveQuests(quests); render(); return;
+            }
             return;
           }
           if (isProtected) return; // not toggleable
@@ -1032,6 +1094,24 @@
     render();
   });
 
+  document.getElementById("copyYesterdayBtn").addEventListener("click", () => {
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    const yKey = y.toISOString().slice(0, 10);
+    const history = loadHistory();
+    const entry = history.find(h => h.date === yKey);
+    if (!entry || !entry.doneIds) {
+      alert("No tengo un registro guardado de ayer para copiar.");
+      return;
+    }
+    const validIds = new Set();
+    quests.forEach(b => b.items.forEach(i => { if (i.type !== "protegida") validIds.add(i.id); }));
+    entry.doneIds.forEach(id => { if (validIds.has(id)) state.done[id] = true; });
+    state.date = todayKey();
+    saveState(state);
+    render();
+  });
+
   document.getElementById("editToggle").addEventListener("click", (e) => {
     editMode = !editMode;
     e.currentTarget.classList.toggle("active", editMode);
@@ -1079,7 +1159,45 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
 
+  // Weekly summary — shown once, automatically, each Sunday
+  function maybeShowWeeklySummary() {
+    if (new Date().getDay() !== 0) return; // only Sundays
+    const flagKey = "quest-log-weekly-shown";
+    if (safeGet(flagKey) === todayKey()) return; // already shown today
+
+    const history = loadHistory();
+    const map = {};
+    history.forEach(h => { map[h.date] = h; });
+    const doneNow = Object.values(state.done).filter(Boolean).length;
+    map[todayKey()] = { done: doneNow, total: totalCount };
+
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    let completedDays = 0, trackedDays = 0;
+    days.forEach(key => {
+      const e = map[key];
+      if (e && e.total > 0) {
+        trackedDays++;
+        if (e.done === e.total) completedDays++;
+      }
+    });
+    const streak = parseInt(safeGet(STREAK_KEY) || "0", 10) || 0;
+
+    document.getElementById("weeklyText").textContent =
+      `Completaste todas tus actividades en ${completedDays} de ${trackedDays || 7} días esta semana. Tu racha actual es de ${streak} día${streak === 1 ? "" : "s"} seguidos.`;
+    document.getElementById("weeklyBackdrop").classList.add("show");
+    safeSet(flagKey, todayKey());
+  }
+  document.getElementById("weeklyClose").addEventListener("click", () => {
+    document.getElementById("weeklyBackdrop").classList.remove("show");
+  });
+
   render();
+  maybeShowWeeklySummary();
 })();
 </script>
 </body>
