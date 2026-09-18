@@ -152,6 +152,7 @@
     margin: -18px 0 22px;
   }
   .critical-row .n { color: var(--gold); font-weight: 600; }
+  .critical-row + .critical-row { margin-top: -14px; }
   .progress-label {
     font-family: var(--font-mono);
     font-size: 12px;
@@ -379,6 +380,22 @@
   }
   .card.editmode .card-actions { display: flex; }
   .card.editmode .box { opacity: 0.4; pointer-events: none; }
+  .quick-actions {
+    display: flex;
+    flex-shrink: 0;
+  }
+  .card.editmode .quick-actions { display: none; }
+  .postpone-btn {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    border: none;
+    background: none;
+    color: var(--text-faint);
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .postpone-btn:hover { color: var(--gold); }
   .icon-btn {
     width: 26px; height: 26px;
     border-radius: 6px;
@@ -623,6 +640,87 @@
     color: var(--text-dim);
   }
   .check-row input { width: 17px; height: 17px; accent-color: var(--teal); }
+
+  .day-select {
+    display: flex;
+    gap: 4px;
+  }
+  .day-btn {
+    flex: 1;
+    padding: 8px 2px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--bg-elev);
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .day-btn.active {
+    border-color: var(--teal);
+    color: var(--teal);
+    background: rgba(79,184,168,0.1);
+  }
+  .checkbox-label {
+    display: flex !important;
+    align-items: center;
+    gap: 9px;
+    font-family: var(--font-mono) !important;
+    font-size: 12px !important;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .checkbox-label input { width: 17px; height: 17px; accent-color: var(--gold); flex-shrink: 0; }
+
+  .card.type-bonus { border-left: 3px dotted var(--teal); }
+  .card.type-bonus .card-title::before { content: "☆ "; color: var(--teal); }
+
+  .days-badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-faint);
+  }
+
+  .daynote { margin: 22px 0 4px; }
+  .daynote-label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-bottom: 8px;
+  }
+  .daynote textarea {
+    width: 100%;
+    min-height: 60px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 13px;
+    color: var(--text);
+    font-family: var(--font-display);
+    font-size: 13.5px;
+    resize: vertical;
+  }
+  .daynote textarea:focus { outline: none; border-color: var(--gold-dim); }
+
+  .heat-scroll { overflow-x: auto; padding-bottom: 6px; }
+  .heat-grid {
+    display: grid;
+    grid-template-rows: repeat(7, 11px);
+    grid-auto-flow: column;
+    gap: 3px;
+    width: max-content;
+  }
+  .heat-cell {
+    width: 11px; height: 11px;
+    border-radius: 2px;
+    background: var(--bg-elev);
+  }
+  .heat-cell.l1 { background: rgba(79,184,168,0.25); }
+  .heat-cell.l2 { background: rgba(79,184,168,0.5); }
+  .heat-cell.l3 { background: rgba(79,184,168,0.75); }
+  .heat-cell.l4 { background: var(--teal); }
+  .heat-cell.today { outline: 1.5px solid var(--gold); outline-offset: 1px; }
 </style>
 </head>
 <body>
@@ -646,13 +744,17 @@
     <div class="progress-label" id="progressLabel">0/0</div>
   </div>
   <div class="critical-row">Críticas: <span class="n" id="criticalLabel">0/0</span></div>
+  <div class="critical-row" id="bonusRow" style="display:none;">Bonus: <span class="n" id="bonusLabel">0/0</span></div>
 
   <div id="blocks"></div>
 
   <div class="history">
     <div class="history-head-row">
       <div class="history-head">ÚLTIMOS 7 DÍAS</div>
-      <button class="cal-toggle" id="calToggle">ver mes ▾</button>
+      <div>
+        <button class="cal-toggle" id="calToggle">ver mes ▾</button>
+        <button class="cal-toggle" id="heatToggle">ver año ▾</button>
+      </div>
     </div>
     <div class="history-row" id="historyRow"></div>
     <div class="calendar" id="calendar">
@@ -663,6 +765,14 @@
       </div>
       <div class="cal-grid" id="calGrid"></div>
     </div>
+    <div class="calendar" id="heatmap">
+      <div class="heat-scroll"><div class="heat-grid" id="heatGrid"></div></div>
+    </div>
+  </div>
+
+  <div class="daynote">
+    <label class="daynote-label" for="dayNoteField">NOTA DEL DÍA</label>
+    <textarea id="dayNoteField" placeholder="¿Cómo te fue hoy?"></textarea>
   </div>
 
   <footer>
@@ -690,6 +800,7 @@
       <label><input type="checkbox" id="prefMotivadora"> Frase motivadora</label>
       <label><input type="checkbox" id="prefCurioso"> Dato curioso</label>
       <label><input type="checkbox" id="prefChiste"> Chiste</label>
+      <label><input type="checkbox" id="prefSound"> Sonido y vibración al marcar</label>
     </div>
     <div class="modal-actions">
       <button class="btn-save" id="menuClose" style="flex:1;">Cerrar</button>
@@ -726,6 +837,21 @@
       </div>
     </div>
     <div class="field">
+      <label>Repetir en</label>
+      <div class="day-select" id="daySelect">
+        <button type="button" class="day-btn" data-day="0">D</button>
+        <button type="button" class="day-btn" data-day="1">L</button>
+        <button type="button" class="day-btn" data-day="2">M</button>
+        <button type="button" class="day-btn" data-day="3">M</button>
+        <button type="button" class="day-btn" data-day="4">J</button>
+        <button type="button" class="day-btn" data-day="5">V</button>
+        <button type="button" class="day-btn" data-day="6">S</button>
+      </div>
+    </div>
+    <div class="field">
+      <label class="checkbox-label"><input type="checkbox" id="fieldBonus"> Side quest (no cuenta en tu contra si no la haces)</label>
+    </div>
+    <div class="field">
       <label>Actividad</label>
       <input type="text" id="fieldTitle" placeholder="Ej. Estirar 10 min">
     </div>
@@ -760,25 +886,26 @@
 
 <script>
 (function () {
+  const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
   const DEFAULT_QUESTS = [
     { block: "MAÑANA", glyph: "☀", items: [
-      { id: "wake", t: "Despertar", time: "06:00", note: "", type: "normal", priority: "opcional" },
-      { id: "water", t: "Agua + unos minutos de luz/aire libre", time: "06:05", note: "", type: "normal", priority: "opcional" },
-      { id: "pre", t: "Snack pre-gym (plátano o pan con miel)", time: "06:15", note: "", type: "normal", priority: "opcional" },
-      { id: "gym", t: "Entrenar pesado", time: "06:30", note: "hasta las 7:30 am", type: "normal", priority: "critica" },
-      { id: "post", t: "Comida fuerte post-gym", time: "07:45", note: "", type: "normal", priority: "critica" },
+      { id: "wake", t: "Despertar", time: "06:00", note: "", type: "normal", priority: "opcional", days: ALL_DAYS.slice(), bonus: false },
+      { id: "water", t: "Agua + unos minutos de luz/aire libre", time: "06:05", note: "", type: "normal", priority: "opcional", days: ALL_DAYS.slice(), bonus: false },
+      { id: "pre", t: "Snack pre-gym (plátano o pan con miel)", time: "06:15", note: "", type: "normal", priority: "opcional", days: ALL_DAYS.slice(), bonus: false },
+      { id: "gym", t: "Entrenar pesado", time: "06:30", note: "hasta las 7:30 am", type: "normal", priority: "critica", days: ALL_DAYS.slice(), bonus: false },
+      { id: "post", t: "Comida fuerte post-gym", time: "07:45", note: "", type: "normal", priority: "critica", days: ALL_DAYS.slice(), bonus: false },
     ]},
     { block: "DÍA", glyph: "◆", items: [
-      { id: "moves", t: "Pausas activas cada 1–2 horas", time: "", note: "", type: "normal", priority: "opcional" },
-      { id: "lunch", t: "Comida del mediodía (proteína + verdura)", time: "", note: "", type: "normal", priority: "critica" },
-      { id: "walk", t: "Caminata", time: "", note: "", type: "normal", priority: "opcional" },
+      { id: "moves", t: "Pausas activas cada 1–2 horas", time: "", note: "", type: "normal", priority: "opcional", days: ALL_DAYS.slice(), bonus: false },
+      { id: "lunch", t: "Comida del mediodía (proteína + verdura)", time: "", note: "", type: "normal", priority: "critica", days: ALL_DAYS.slice(), bonus: false },
+      { id: "walk", t: "Caminata", time: "", note: "", type: "normal", priority: "opcional", days: ALL_DAYS.slice(), bonus: false },
     ]},
     { block: "TARDE", glyph: "◐", items: [
-      { id: "dinner", t: "Cena ligera", time: "17:30", note: "antes de las 6:00 pm", type: "normal", priority: "critica" },
-      { id: "zone", t: "Videojuegos / llamada con amigos", time: "18:00", note: "hasta 11–12 pm", type: "protegida", priority: "opcional" },
+      { id: "dinner", t: "Cena ligera", time: "17:30", note: "antes de las 6:00 pm", type: "normal", priority: "critica", days: ALL_DAYS.slice(), bonus: false },
+      { id: "zone", t: "Videojuegos / llamada con amigos", time: "18:00", note: "hasta 11–12 pm", type: "protegida", priority: "opcional", days: ALL_DAYS.slice(), bonus: false },
     ]},
     { block: "NOCHE", glyph: "☾", items: [
-      { id: "sleep", t: "Dormir", time: "", note: "", type: "normal", priority: "critica" },
+      { id: "sleep", t: "Dormir", time: "", note: "", type: "normal", priority: "critica", days: ALL_DAYS.slice(), bonus: false },
     ]},
   ];
 
@@ -802,6 +929,35 @@
   function nowHHMM() {
     const d = new Date();
     return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+
+  const DAY_LETTERS = ["D", "L", "M", "M", "J", "V", "S"];
+
+  const SOUND_PREF_KEY = "quest-log-sound-pref";
+  function soundEnabled() { return safeGet(SOUND_PREF_KEY) !== "off"; }
+  let audioCtx = null;
+  function beep(freq, duration, vol) {
+    if (!soundEnabled()) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = "sine";
+      o.frequency.value = freq;
+      g.gain.value = vol;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start();
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration / 1000);
+      o.stop(audioCtx.currentTime + duration / 1000);
+    } catch (e) {}
+  }
+  function hapticTick() {
+    if (!soundEnabled()) return;
+    try { navigator.vibrate && navigator.vibrate(12); } catch (e) {}
+  }
+  function hapticCelebrate() {
+    if (!soundEnabled()) return;
+    try { navigator.vibrate && navigator.vibrate([30, 40, 30, 40, 70]); } catch (e) {}
   }
 
   function makeId() { return "q" + Date.now() + Math.floor(Math.random() * 1000); }
@@ -845,6 +1001,8 @@
     if (!item.type) item.type = "normal";
     if (item.note === undefined) item.note = "";
     if (!item.priority) item.priority = "opcional";
+    if (!item.days || !Array.isArray(item.days) || item.days.length === 0) item.days = [0, 1, 2, 3, 4, 5, 6];
+    if (item.bonus === undefined) item.bonus = false;
     // already migrated (24h HH:MM or empty)
     if (item.time === "" || /^\d{2}:\d{2}$/.test(item.time)) return item;
     // old free-text time like "6:15 am" or "antes de 6:00 pm"
@@ -871,7 +1029,7 @@
     if (!raw) return [];
     try { return JSON.parse(raw); } catch (e) { return []; }
   }
-  function saveHistory(h) { safeSet(HISTORY_KEY, JSON.stringify(h.slice(-120))); }
+  function saveHistory(h) { safeSet(HISTORY_KEY, JSON.stringify(h.slice(-370))); }
 
   function archiveIfNewDay(prevState, total) {
     if (!prevState || prevState.date === todayKey()) return;
@@ -916,6 +1074,7 @@
   let totalCount = quests.reduce((n, b) => n + b.items.filter(i => i.type !== "protegida").length, 0);
   let state = loadState(totalCount);
   let editMode = false;
+  let todayTotal = 0, todayDoneCount = 0; // updated at the end of every render(), reflects today's day-filtered, non-bonus count
 
   const dayNames = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
   document.getElementById("dayName").textContent = dayNames[new Date().getDay()];
@@ -964,9 +1123,12 @@
   const fieldNote = document.getElementById("fieldNote");
   const typeSelect = document.getElementById("typeSelect");
   const prioritySelect = document.getElementById("prioritySelect");
+  const daySelect = document.getElementById("daySelect");
+  const fieldBonus = document.getElementById("fieldBonus");
   const timeWarning = document.getElementById("timeWarning");
   let selectedType = "normal";
   let selectedPriority = "opcional";
+  let selectedDays = ALL_DAYS.slice();
   let editingItemId = null; // id of the item currently open in the modal, if editing
 
   typeSelect.querySelectorAll(".type-btn").forEach(btn => {
@@ -979,6 +1141,18 @@
     btn.addEventListener("click", () => {
       selectedPriority = btn.dataset.priority;
       prioritySelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b === btn));
+    });
+  });
+  daySelect.querySelectorAll(".day-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const d = parseInt(btn.dataset.day, 10);
+      if (selectedDays.includes(d)) {
+        if (selectedDays.length === 1) return; // keep at least one day selected
+        selectedDays = selectedDays.filter(x => x !== d);
+      } else {
+        selectedDays.push(d);
+      }
+      btn.classList.toggle("active", selectedDays.includes(d));
     });
   });
 
@@ -1003,6 +1177,8 @@
       fieldNote.value = "";
       selectedType = ctx.presetType || "normal";
       selectedPriority = "opcional";
+      selectedDays = ALL_DAYS.slice();
+      fieldBonus.checked = false;
       editingItemId = null;
       modalDeleteRow.style.display = "none";
     } else {
@@ -1013,11 +1189,14 @@
       fieldNote.value = item.note || "";
       selectedType = item.type || "normal";
       selectedPriority = item.priority || "opcional";
+      selectedDays = (item.days && item.days.length) ? item.days.slice() : ALL_DAYS.slice();
+      fieldBonus.checked = !!item.bonus;
       editingItemId = item.id;
       modalDeleteRow.style.display = "flex";
     }
     typeSelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b.dataset.type === selectedType));
     prioritySelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b.dataset.priority === selectedPriority));
+    daySelect.querySelectorAll(".day-btn").forEach(b => b.classList.toggle("active", selectedDays.includes(parseInt(b.dataset.day, 10))));
     resetDeleteBtn();
     checkTimeOverlap();
     modalBackdrop.classList.add("show");
@@ -1043,7 +1222,7 @@
 
     if (modalCtx.isNew) {
       const id = makeId();
-      quests[targetBlockIdx].items.push({ id, t: title, time, note, type: selectedType, priority: selectedPriority });
+      quests[targetBlockIdx].items.push({ id, t: title, time, note, type: selectedType, priority: selectedPriority, days: selectedDays.slice(), bonus: fieldBonus.checked });
     } else {
       const item = quests[modalCtx.blockIdx].items[modalCtx.itemIdx];
       item.t = title;
@@ -1051,6 +1230,8 @@
       item.note = note;
       item.type = selectedType;
       item.priority = selectedPriority;
+      item.days = selectedDays.slice();
+      item.bonus = fieldBonus.checked;
       if (targetBlockIdx !== modalCtx.blockIdx) {
         quests[modalCtx.blockIdx].items.splice(modalCtx.itemIdx, 1);
         quests[targetBlockIdx].items.push(item);
@@ -1087,10 +1268,34 @@
     render();
   });
 
+  function postponeItem(bIdx, iIdx) {
+    const block = quests[bIdx];
+    const item = block.items[iIdx];
+    if (item.time) {
+      const mins = Math.min(parseTimeToMinutes(item.time) + 60, 23 * 60 + 59);
+      item.time = minutesTo24(mins);
+      const targetIdx = blockIdxForMinutes(mins);
+      if (targetIdx !== bIdx) {
+        block.items.splice(iIdx, 1);
+        quests[targetIdx].items.push(item);
+        sortBlockByTime(quests[targetIdx]);
+      } else {
+        sortBlockByTime(block);
+      }
+    } else {
+      const nextIdx = (bIdx + 1) % quests.length;
+      block.items.splice(iIdx, 1);
+      quests[nextIdx].items.push(item);
+    }
+    saveQuests(quests);
+    render();
+  }
+
   function render() {
     blocksEl.innerHTML = "";
-    let total = 0, done = 0, critTotal = 0, critDone = 0;
+    let total = 0, done = 0, critTotal = 0, critDone = 0, bonusTotal = 0, bonusDone = 0;
     const curBlock = currentBlockIdx();
+    const todayDow = new Date().getDay();
 
     quests.forEach((block, bIdx) => {
       const blockEl = document.createElement("div");
@@ -1103,17 +1308,27 @@
       head.innerHTML = `<span class="glyph">${block.glyph}</span><h2>${block.block}</h2><span class="span">${BLOCK_RANGES[bIdx].label}</span>`;
       blockEl.appendChild(head);
 
+      let visibleCount = 0;
       block.items.forEach((item, iIdx) => {
+        const days = (item.days && item.days.length) ? item.days : ALL_DAYS;
+        const scheduledToday = days.length >= 7 || days.includes(todayDow);
+        if (!editMode && !scheduledToday) return; // hidden today, only visible while editing
+
+        visibleCount++;
         const isProtected = item.type === "protegida";
-        const isCritical = item.priority === "critica" && !isProtected;
-        if (!isProtected) total++;
+        const isBonus = !!item.bonus && !isProtected;
+        const isCritical = item.priority === "critica" && !isProtected && !isBonus;
+        if (!isProtected && !isBonus) total++;
+        if (isBonus) bonusTotal++;
         if (isCritical) critTotal++;
         const isDone = !!state.done[item.id];
-        if (!isProtected && isDone) done++;
+        if (!isProtected && !isBonus && isDone) done++;
+        if (isBonus && isDone) bonusDone++;
         if (isCritical && isDone) critDone++;
 
         const timeLabel = formatTimeDisplay(item.time);
-        const timeLine = [timeLabel, item.note].filter(Boolean).join(" · ");
+        const daysBadge = days.length < 7 ? days.slice().sort().map(d => DAY_LETTERS[d]).join("") : "";
+        const timeLine = [timeLabel, item.note, daysBadge].filter(Boolean).join(" · ");
 
         const card = document.createElement("div");
         card.className = "card"
@@ -1121,16 +1336,19 @@
           + (editMode ? " editmode" : "")
           + (item.type === "protegida" ? " type-protegida" : "")
           + (item.type === "imprevisto" ? " type-imprevisto" : "")
-          + (isCritical ? " priority-critica" : "");
+          + (isCritical ? " priority-critica" : "")
+          + (isBonus ? " type-bonus" : "");
         const canReorder = !item.time;
         const isFirst = iIdx === 0;
         const isLast = iIdx === block.items.length - 1;
+        const showPostpone = !editMode && !isProtected && !isDone;
         card.innerHTML = `
           <div class="box">${isProtected ? "" : checkIcon()}</div>
           <div class="card-body">
             <div class="card-title">${item.t}</div>
             ${timeLine ? `<div class="card-time">${timeLine}</div>` : ""}
           </div>
+          ${showPostpone ? `<div class="quick-actions"><button class="postpone-btn" aria-label="Posponer" title="Posponer">⏭</button></div>` : ""}
           <div class="card-actions">
             ${canReorder ? `<button class="icon-btn move-up" aria-label="Subir" ${isFirst ? "disabled" : ""}>▲</button>
             <button class="icon-btn move-down" aria-label="Bajar" ${isLast ? "disabled" : ""}>▼</button>` : ""}
@@ -1150,10 +1368,13 @@
             }
             return;
           }
+          if (e.target.closest(".postpone-btn")) { postponeItem(bIdx, iIdx); return; }
           if (isProtected) return; // not toggleable
-          state.done[item.id] = !state.done[item.id];
+          const willBeDone = !state.done[item.id];
+          state.done[item.id] = willBeDone;
           state.date = todayKey();
           saveState(state);
+          if (willBeDone) { beep(880, 70, 0.035); hapticTick(); }
           render();
         });
         blockEl.appendChild(card);
@@ -1171,6 +1392,12 @@
     document.getElementById("progressLabel").textContent = `${done}/${total}`;
     document.getElementById("barFill").style.width = total ? `${(done / total) * 100}%` : "0%";
     document.getElementById("criticalLabel").textContent = `${critDone}/${critTotal}`;
+    const bonusRow = document.getElementById("bonusRow");
+    bonusRow.style.display = bonusTotal > 0 ? "block" : "none";
+    document.getElementById("bonusLabel").textContent = `${bonusDone}/${bonusTotal}`;
+
+    todayTotal = total;
+    todayDoneCount = done;
 
     const allDone = total > 0 && done === total;
     const streak = updateStreak(allDone);
@@ -1179,6 +1406,7 @@
 
     renderHistory(done, total);
     renderCalendar(done, total);
+    renderHeatmap();
   }
 
   function updateFocusClasses() {
@@ -1274,20 +1502,64 @@
     calOpen = !calOpen;
     e.currentTarget.classList.toggle("active", calOpen);
     document.getElementById("calendar").classList.toggle("show", calOpen);
-    if (calOpen) {
-      const doneNow = Object.values(state.done).filter(Boolean).length;
-      renderCalendar(doneNow, totalCount);
-    }
+    if (calOpen) renderCalendar(todayDoneCount, todayTotal);
   });
   document.getElementById("calPrev").addEventListener("click", () => {
     calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() - 1, 1);
-    const doneNow = Object.values(state.done).filter(Boolean).length;
-    renderCalendar(doneNow, totalCount);
+    renderCalendar(todayDoneCount, todayTotal);
   });
   document.getElementById("calNext").addEventListener("click", () => {
     calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() + 1, 1);
-    const doneNow = Object.values(state.done).filter(Boolean).length;
-    renderCalendar(doneNow, totalCount);
+    renderCalendar(todayDoneCount, todayTotal);
+  });
+
+  let heatOpen = false;
+  function renderHeatmap() {
+    if (!heatOpen) return;
+    const history = loadHistory();
+    const map = {};
+    history.forEach(h => { map[h.date] = h; });
+    map[todayKey()] = { done: todayDoneCount, total: todayTotal };
+
+    const grid = document.getElementById("heatGrid");
+    grid.innerHTML = "";
+    const days = [];
+    for (let i = 364; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push(d);
+    }
+    // pad the front so the grid starts on a Sunday (row 0)
+    const lead = days[0].getDay();
+    for (let i = 0; i < lead; i++) {
+      const empty = document.createElement("div");
+      empty.className = "heat-cell";
+      empty.style.visibility = "hidden";
+      grid.appendChild(empty);
+    }
+    days.forEach(d => {
+      const key = localDateKey(d);
+      const entry = map[key];
+      const cell = document.createElement("div");
+      let cls = "heat-cell";
+      if (entry && entry.total > 0) {
+        const pct = entry.done / entry.total;
+        if (pct >= 1) cls += " l4";
+        else if (pct >= 0.75) cls += " l3";
+        else if (pct >= 0.4) cls += " l2";
+        else if (pct > 0) cls += " l1";
+      }
+      if (key === todayKey()) cls += " today";
+      cell.className = cls;
+      cell.title = entry ? `${key}: ${entry.done}/${entry.total}` : key;
+      grid.appendChild(cell);
+    });
+  }
+  document.getElementById("heatToggle").addEventListener("click", (e) => {
+    heatOpen = !heatOpen;
+    e.currentTarget.classList.toggle("active", heatOpen);
+    document.getElementById("heatmap").classList.toggle("show", heatOpen);
+    if (heatOpen) renderHeatmap();
   });
 
   document.getElementById("resetBtn").addEventListener("click", () => {
@@ -1336,7 +1608,7 @@
 
   document.getElementById("exportBtn").addEventListener("click", () => {
     const history = loadHistory();
-    const todayEntry = { date: todayKey(), done: Object.values(state.done).filter(Boolean).length, total: totalCount };
+    const todayEntry = { date: todayKey(), done: todayDoneCount, total: todayTotal };
     const map = {};
     history.forEach(h => { map[h.date] = h; });
     map[todayEntry.date] = todayEntry;
@@ -1503,19 +1775,28 @@
     });
   })();
 
+  const prefSoundBox = document.getElementById("prefSound");
+  prefSoundBox.checked = soundEnabled();
+  prefSoundBox.addEventListener("change", () => {
+    safeSet(SOUND_PREF_KEY, prefSoundBox.checked ? "on" : "off");
+  });
+
   function maybeShowCompletion(allDoneNow) {
     const flagKey = "quest-log-complete-shown";
     if (!allDoneNow) return;
     if (safeGet(flagKey) === todayKey()) return;
+    safeSet(flagKey, todayKey());
+    beep(660, 90, 0.05);
+    setTimeout(() => beep(880, 130, 0.05), 110);
+    hapticCelebrate();
     const prefs = loadCompletePrefs();
-    if (prefs.length === 0) { safeSet(flagKey, todayKey()); return; }
+    if (prefs.length === 0) return;
     const category = prefs[Math.floor(Math.random() * prefs.length)];
     const pool = PHRASES[category] || [];
-    if (pool.length === 0) { safeSet(flagKey, todayKey()); return; }
+    if (pool.length === 0) return;
     const phrase = pool[Math.floor(Math.random() * pool.length)];
     document.getElementById("completeText").textContent = phrase;
     document.getElementById("completeBackdrop").classList.add("show");
-    safeSet(flagKey, todayKey());
   }
   document.getElementById("completeClose").addEventListener("click", () => {
     document.getElementById("completeBackdrop").classList.remove("show");
@@ -1530,8 +1811,7 @@
     const history = loadHistory();
     const map = {};
     history.forEach(h => { map[h.date] = h; });
-    const doneNow = Object.values(state.done).filter(Boolean).length;
-    map[todayKey()] = { done: doneNow, total: totalCount };
+    map[todayKey()] = { done: todayDoneCount, total: todayTotal };
 
     const days = [];
     for (let i = 0; i < 7; i++) {
@@ -1556,6 +1836,30 @@
   }
   document.getElementById("weeklyClose").addEventListener("click", () => {
     document.getElementById("weeklyBackdrop").classList.remove("show");
+  });
+
+  // Daily notes
+  const NOTES_KEY = "quest-log-notes";
+  function loadNotes() {
+    const raw = safeGet(NOTES_KEY);
+    if (!raw) return {};
+    try { return JSON.parse(raw); } catch (e) { return {}; }
+  }
+  function saveNotes(n) { safeSet(NOTES_KEY, JSON.stringify(n)); }
+  const dayNoteField = document.getElementById("dayNoteField");
+  dayNoteField.value = (loadNotes()[todayKey()] || "");
+  let noteSaveTimer = null;
+  dayNoteField.addEventListener("input", () => {
+    clearTimeout(noteSaveTimer);
+    noteSaveTimer = setTimeout(() => {
+      const notes = loadNotes();
+      const text = dayNoteField.value.trim();
+      if (text) notes[todayKey()] = text; else delete notes[todayKey()];
+      // keep roughly a year of notes
+      const keys = Object.keys(notes).sort();
+      if (keys.length > 370) delete notes[keys[0]];
+      saveNotes(notes);
+    }, 500);
   });
 
   render();
