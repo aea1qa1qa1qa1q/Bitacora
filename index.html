@@ -208,8 +208,8 @@
     transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
     user-select: none;
     box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-    animation: cardIn 0.25s ease both;
   }
+  .wrap { animation: cardIn 0.35s ease both; }
   .card:active { transform: scale(0.995); }
   .card.done {
     background: var(--bg-card-done);
@@ -351,6 +351,7 @@
     font-size: 14px;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
+    z-index: 60;
   }
   .edit-toggle {
     position: fixed;
@@ -363,6 +364,7 @@
     font-size: 13px;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
+    z-index: 60;
   }
   .edit-toggle.active {
     color: var(--gold);
@@ -1025,7 +1027,8 @@
 
     quests.forEach((block, bIdx) => {
       const blockEl = document.createElement("div");
-      blockEl.className = "block" + (bIdx === curBlock ? " current-block" : " not-current");
+      const isCur = bIdx === curBlock;
+      blockEl.className = "block" + (isCur ? " current-block" : "") + (!editMode && !isCur ? " not-current" : "");
       blockEl.dataset.blockIdx = bIdx;
 
       const head = document.createElement("div");
@@ -1115,7 +1118,7 @@
     Array.from(blocksEl.children).forEach(el => {
       const idx = parseInt(el.dataset.blockIdx, 10);
       el.classList.toggle("current-block", idx === curBlock);
-      el.classList.toggle("not-current", idx !== curBlock);
+      el.classList.toggle("not-current", !editMode && idx !== curBlock);
     });
   }
   setInterval(updateFocusClasses, 60000);
