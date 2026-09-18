@@ -74,15 +74,25 @@
   }
   body {
     min-height: 100vh;
-    padding: 28px 16px 60px;
+    padding: 28px 16px 90px;
+    background-image: radial-gradient(circle at 15% 0%, rgba(224,176,78,0.06), transparent 45%),
+                       radial-gradient(circle at 100% 20%, rgba(79,184,168,0.05), transparent 40%);
+    background-attachment: fixed;
   }
   .wrap { max-width: 560px; margin: 0 auto; }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 
   header {
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
     margin-bottom: 6px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
   }
   .title { display: flex; flex-direction: column; }
   .kicker {
@@ -132,8 +142,16 @@
     height: 100%;
     background: linear-gradient(90deg, var(--teal), var(--gold));
     width: 0%;
-    transition: width 0.4s ease;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 10px rgba(224,176,78,0.35);
   }
+  .critical-row {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    margin: -18px 0 22px;
+  }
+  .critical-row .n { color: var(--gold); font-weight: 600; }
   .progress-label {
     font-family: var(--font-mono);
     font-size: 12px;
@@ -143,7 +161,9 @@
 
   .block {
     margin-bottom: 22px;
+    transition: opacity 0.4s ease, filter 0.4s ease;
   }
+  .block.not-current { opacity: 0.5; filter: saturate(0.7); }
   .block-head {
     display: flex;
     align-items: baseline;
@@ -159,6 +179,15 @@
     letter-spacing: 0.03em;
     color: var(--text-dim);
     margin: 0;
+  }
+  .block.current-block .block-head h2 { color: var(--gold); }
+  .block.current-block .block-head::after {
+    content: "";
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--teal);
+    box-shadow: 0 0 6px var(--teal);
+    margin-left: 2px;
   }
   .block-head .span {
     font-family: var(--font-mono);
@@ -176,14 +205,19 @@
     padding: 13px 14px;
     margin-bottom: 8px;
     cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
     user-select: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    animation: cardIn 0.25s ease both;
   }
   .card:active { transform: scale(0.995); }
   .card.done {
     background: var(--bg-card-done);
     border-color: var(--border-done);
+    box-shadow: none;
   }
+  .card.priority-critica { border-left: 3px solid var(--gold); }
+  .card.priority-critica.done { border-left-color: var(--gold-dim); }
   .box {
     flex-shrink: 0;
     width: 22px; height: 22px;
@@ -528,7 +562,33 @@
   .cal-cell.empty { background: none; border: none; }
   .cal-cell.complete { background: var(--teal); border-color: var(--teal); color: #0c1613; }
   .cal-cell.partial { background: var(--gold-dim); border-color: var(--gold-dim); color: #23190a; }
-  .cal-cell.today { border-color: var(--gold); border-width: 1.5px; }
+  .field-warning {
+    display: none;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--danger);
+    margin-top: 5px;
+  }
+  .field-warning.show { display: block; }
+
+  .fab {
+    position: fixed;
+    right: 18px;
+    bottom: 22px;
+    width: 54px; height: 54px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal), var(--gold));
+    color: #0c1613;
+    border: none;
+    font-size: 26px;
+    font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    cursor: pointer;
+    z-index: 40;
+    line-height: 1;
+  }
+  .fab:active { transform: scale(0.95); }
 </style>
 </head>
 <body>
@@ -550,6 +610,7 @@
     <div class="bar"><div class="bar-fill" id="barFill"></div></div>
     <div class="progress-label" id="progressLabel">0/0</div>
   </div>
+  <div class="critical-row">Críticas: <span class="n" id="criticalLabel">0/0</span></div>
 
   <div id="blocks"></div>
 
@@ -573,9 +634,15 @@
     <button class="reset-btn" id="resetBtn">reiniciar hoy</button>
     <button class="reset-btn" id="copyYesterdayBtn" style="margin-left:8px;">marcar todo como ayer</button>
     <button class="reset-btn" id="exportBtn" style="margin-left:8px;">exportar historial (.csv)</button>
+    <br>
+    <button class="reset-btn" id="backupExportBtn" style="margin-top:8px;">backup completo (.json)</button>
+    <button class="reset-btn" id="backupImportBtn" style="margin-left:8px; margin-top:8px;">restaurar backup</button>
+    <input type="file" id="backupFileInput" accept="application/json" style="display:none;">
     <div class="date-note" id="dateNote"></div>
   </footer>
 </div>
+
+<button class="fab" id="fabQuick" aria-label="Surgió algo">+</button>
 
 <div class="modal-backdrop" id="modalBackdrop">
   <div class="modal">
@@ -589,12 +656,20 @@
       </div>
     </div>
     <div class="field">
+      <label>Prioridad</label>
+      <div class="type-select" id="prioritySelect">
+        <button type="button" class="type-btn" data-priority="opcional">Opcional</button>
+        <button type="button" class="type-btn" data-priority="critica">Crítica</button>
+      </div>
+    </div>
+    <div class="field">
       <label>Actividad</label>
       <input type="text" id="fieldTitle" placeholder="Ej. Estirar 10 min">
     </div>
     <div class="field">
       <label>Hora (opcional)</label>
       <input type="time" id="fieldTime">
+      <div class="field-warning" id="timeWarning"></div>
     </div>
     <div class="field">
       <label>Nota (opcional)</label>
@@ -624,23 +699,23 @@
 (function () {
   const DEFAULT_QUESTS = [
     { block: "MAÑANA", glyph: "☀", items: [
-      { id: "wake", t: "Despertar", time: "06:00", note: "", type: "normal" },
-      { id: "water", t: "Agua + unos minutos de luz/aire libre", time: "06:05", note: "", type: "normal" },
-      { id: "pre", t: "Snack pre-gym (plátano o pan con miel)", time: "06:15", note: "", type: "normal" },
-      { id: "gym", t: "Entrenar pesado", time: "06:30", note: "hasta las 7:30 am", type: "normal" },
-      { id: "post", t: "Comida fuerte post-gym", time: "07:45", note: "", type: "normal" },
+      { id: "wake", t: "Despertar", time: "06:00", note: "", type: "normal", priority: "opcional" },
+      { id: "water", t: "Agua + unos minutos de luz/aire libre", time: "06:05", note: "", type: "normal", priority: "opcional" },
+      { id: "pre", t: "Snack pre-gym (plátano o pan con miel)", time: "06:15", note: "", type: "normal", priority: "opcional" },
+      { id: "gym", t: "Entrenar pesado", time: "06:30", note: "hasta las 7:30 am", type: "normal", priority: "critica" },
+      { id: "post", t: "Comida fuerte post-gym", time: "07:45", note: "", type: "normal", priority: "critica" },
     ]},
     { block: "DÍA", glyph: "◆", items: [
-      { id: "moves", t: "Pausas activas cada 1–2 horas", time: "", note: "", type: "normal" },
-      { id: "lunch", t: "Comida del mediodía (proteína + verdura)", time: "", note: "", type: "normal" },
-      { id: "walk", t: "Caminata", time: "", note: "", type: "normal" },
+      { id: "moves", t: "Pausas activas cada 1–2 horas", time: "", note: "", type: "normal", priority: "opcional" },
+      { id: "lunch", t: "Comida del mediodía (proteína + verdura)", time: "", note: "", type: "normal", priority: "critica" },
+      { id: "walk", t: "Caminata", time: "", note: "", type: "normal", priority: "opcional" },
     ]},
     { block: "TARDE", glyph: "◐", items: [
-      { id: "dinner", t: "Cena ligera", time: "17:30", note: "antes de las 6:00 pm", type: "normal" },
-      { id: "zone", t: "Videojuegos / llamada con amigos", time: "18:00", note: "hasta 11–12 pm", type: "protegida" },
+      { id: "dinner", t: "Cena ligera", time: "17:30", note: "antes de las 6:00 pm", type: "normal", priority: "critica" },
+      { id: "zone", t: "Videojuegos / llamada con amigos", time: "18:00", note: "hasta 11–12 pm", type: "protegida", priority: "opcional" },
     ]},
     { block: "NOCHE", glyph: "☾", items: [
-      { id: "sleep", t: "Dormir", time: "", note: "", type: "normal" },
+      { id: "sleep", t: "Dormir", time: "", note: "", type: "normal", priority: "critica" },
     ]},
   ];
 
@@ -655,6 +730,15 @@
     if (mins >= 720 && mins < 960) return 1;
     if (mins >= 960 && mins < 1200) return 2;
     return 3; // 20:00–04:59
+  }
+  function currentMinutes() {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  }
+  function currentBlockIdx() { return blockIdxForMinutes(currentMinutes()); }
+  function nowHHMM() {
+    const d = new Date();
+    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
   }
 
   function makeId() { return "q" + Date.now() + Math.floor(Math.random() * 1000); }
@@ -691,6 +775,7 @@
   function migrateItem(item) {
     if (!item.type) item.type = "normal";
     if (item.note === undefined) item.note = "";
+    if (!item.priority) item.priority = "opcional";
     // already migrated (24h HH:MM or empty)
     if (item.time === "" || /^\d{2}:\d{2}$/.test(item.time)) return item;
     // old free-text time like "6:15 am" or "antes de 6:00 pm"
@@ -809,7 +894,11 @@
 
   const fieldNote = document.getElementById("fieldNote");
   const typeSelect = document.getElementById("typeSelect");
+  const prioritySelect = document.getElementById("prioritySelect");
+  const timeWarning = document.getElementById("timeWarning");
   let selectedType = "normal";
+  let selectedPriority = "opcional";
+  let editingItemId = null; // id of the item currently open in the modal, if editing
 
   typeSelect.querySelectorAll(".type-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -817,15 +906,35 @@
       typeSelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b === btn));
     });
   });
+  prioritySelect.querySelectorAll(".type-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectedPriority = btn.dataset.priority;
+      prioritySelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b === btn));
+    });
+  });
+
+  function checkTimeOverlap() {
+    const time = fieldTime.value;
+    if (!time) { timeWarning.classList.remove("show"); return; }
+    const mins = parseTimeToMinutes(time);
+    if (mins === null) { timeWarning.classList.remove("show"); return; }
+    const targetIdx = blockIdxForMinutes(mins);
+    const clash = quests[targetIdx].items.some(i => i.time === time && i.id !== editingItemId);
+    timeWarning.textContent = clash ? "⚠ Ya tienes otra actividad a esta hora en ese bloque." : "";
+    timeWarning.classList.toggle("show", clash);
+  }
+  fieldTime.addEventListener("input", checkTimeOverlap);
 
   function openModal(ctx) {
     modalCtx = ctx;
     if (ctx.isNew) {
       modalTitle.textContent = "Nueva actividad";
       fieldTitle.value = "";
-      fieldTime.value = "";
+      fieldTime.value = ctx.presetTime || "";
       fieldNote.value = "";
-      selectedType = "normal";
+      selectedType = ctx.presetType || "normal";
+      selectedPriority = "opcional";
+      editingItemId = null;
       modalDeleteRow.style.display = "none";
     } else {
       const item = quests[ctx.blockIdx].items[ctx.itemIdx];
@@ -834,10 +943,14 @@
       fieldTime.value = item.time || "";
       fieldNote.value = item.note || "";
       selectedType = item.type || "normal";
+      selectedPriority = item.priority || "opcional";
+      editingItemId = item.id;
       modalDeleteRow.style.display = "flex";
     }
     typeSelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b.dataset.type === selectedType));
+    prioritySelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b.dataset.priority === selectedPriority));
     resetDeleteBtn();
+    checkTimeOverlap();
     modalBackdrop.classList.add("show");
     setTimeout(() => fieldTitle.focus(), 50);
   }
@@ -861,13 +974,14 @@
 
     if (modalCtx.isNew) {
       const id = makeId();
-      quests[targetBlockIdx].items.push({ id, t: title, time, note, type: selectedType });
+      quests[targetBlockIdx].items.push({ id, t: title, time, note, type: selectedType, priority: selectedPriority });
     } else {
       const item = quests[modalCtx.blockIdx].items[modalCtx.itemIdx];
       item.t = title;
       item.time = time;
       item.note = note;
       item.type = selectedType;
+      item.priority = selectedPriority;
       if (targetBlockIdx !== modalCtx.blockIdx) {
         quests[modalCtx.blockIdx].items.splice(modalCtx.itemIdx, 1);
         quests[targetBlockIdx].items.push(item);
@@ -906,11 +1020,13 @@
 
   function render() {
     blocksEl.innerHTML = "";
-    let total = 0, done = 0;
+    let total = 0, done = 0, critTotal = 0, critDone = 0;
+    const curBlock = currentBlockIdx();
 
     quests.forEach((block, bIdx) => {
       const blockEl = document.createElement("div");
-      blockEl.className = "block";
+      blockEl.className = "block" + (bIdx === curBlock ? " current-block" : " not-current");
+      blockEl.dataset.blockIdx = bIdx;
 
       const head = document.createElement("div");
       head.className = "block-head";
@@ -919,9 +1035,12 @@
 
       block.items.forEach((item, iIdx) => {
         const isProtected = item.type === "protegida";
+        const isCritical = item.priority === "critica" && !isProtected;
         if (!isProtected) total++;
+        if (isCritical) critTotal++;
         const isDone = !!state.done[item.id];
         if (!isProtected && isDone) done++;
+        if (isCritical && isDone) critDone++;
 
         const timeLabel = formatTimeDisplay(item.time);
         const timeLine = [timeLabel, item.note].filter(Boolean).join(" · ");
@@ -931,7 +1050,8 @@
           + (isDone && !isProtected ? " done" : "")
           + (editMode ? " editmode" : "")
           + (item.type === "protegida" ? " type-protegida" : "")
-          + (item.type === "imprevisto" ? " type-imprevisto" : "");
+          + (item.type === "imprevisto" ? " type-imprevisto" : "")
+          + (isCritical ? " priority-critica" : "");
         const canReorder = !item.time;
         const isFirst = iIdx === 0;
         const isLast = iIdx === block.items.length - 1;
@@ -980,14 +1100,25 @@
 
     document.getElementById("progressLabel").textContent = `${done}/${total}`;
     document.getElementById("barFill").style.width = total ? `${(done / total) * 100}%` : "0%";
+    document.getElementById("criticalLabel").textContent = `${critDone}/${critTotal}`;
 
     const allDone = total > 0 && done === total;
     const streak = updateStreak(allDone);
-    document.getElementById("streakN").textContent = streak;
+    document.getElementById("streakN").textContent = (streak > 0 ? "🔥 " : "") + streak;
 
     renderHistory(done, total);
     renderCalendar(done, total);
   }
+
+  function updateFocusClasses() {
+    const curBlock = currentBlockIdx();
+    Array.from(blocksEl.children).forEach(el => {
+      const idx = parseInt(el.dataset.blockIdx, 10);
+      el.classList.toggle("current-block", idx === curBlock);
+      el.classList.toggle("not-current", idx !== curBlock);
+    });
+  }
+  setInterval(updateFocusClasses, 60000);
 
   function renderHistory(todayDone, todayTotal) {
     const history = loadHistory();
@@ -1157,6 +1288,64 @@
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  document.getElementById("fabQuick").addEventListener("click", () => {
+    const time = nowHHMM();
+    const blockIdx = blockIdxForMinutes(parseTimeToMinutes(time));
+    openModal({ blockIdx, isNew: true, presetType: "imprevisto", presetTime: time });
+  });
+
+  document.getElementById("backupExportBtn").addEventListener("click", () => {
+    const backup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      quests,
+      state,
+      history: loadHistory(),
+      streak: safeGet(STREAK_KEY) || "0",
+      streakDate: safeGet(STREAK_KEY + "-date") || "",
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bitacora-backup-${todayKey()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  const backupFileInput = document.getElementById("backupFileInput");
+  document.getElementById("backupImportBtn").addEventListener("click", () => backupFileInput.click());
+  backupFileInput.addEventListener("change", () => {
+    const file = backupFileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data;
+      try { data = JSON.parse(reader.result); } catch (e) {
+        alert("Ese archivo no es un backup válido.");
+        backupFileInput.value = "";
+        return;
+      }
+      if (!data || !Array.isArray(data.quests)) {
+        alert("Ese archivo no es un backup válido.");
+        backupFileInput.value = "";
+        return;
+      }
+      const ok = confirm("Esto va a reemplazar tus actividades y tu historial actuales con los del backup. ¿Continuar?");
+      backupFileInput.value = "";
+      if (!ok) return;
+      saveQuests(data.quests);
+      if (data.state) saveState(data.state);
+      if (Array.isArray(data.history)) saveHistory(data.history);
+      if (data.streak) safeSet(STREAK_KEY, data.streak);
+      if (data.streakDate) safeSet(STREAK_KEY + "-date", data.streakDate);
+      location.reload();
+    };
+    reader.readAsText(file);
   });
 
   // Weekly summary — shown once, automatically, each Sunday
