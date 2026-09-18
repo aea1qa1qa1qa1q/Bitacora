@@ -1124,7 +1124,10 @@
     try { streak = parseInt(safeGet(STREAK_KEY) || "0", 10) || 0; } catch (e) {}
     let lastCompleteDate = safeGet(STREAK_KEY + "-date") || "";
     if (allDoneNow && lastCompleteDate !== todayKey()) {
-      streak += 1;
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const wasConsecutive = lastCompleteDate === localDateKey(yesterday);
+      streak = wasConsecutive ? streak + 1 : 1;
       safeSet(STREAK_KEY, String(streak));
       safeSet(STREAK_KEY + "-date", todayKey());
     }
@@ -1234,6 +1237,7 @@
         selectedDays.push(d);
       }
       btn.classList.toggle("active", selectedDays.includes(d));
+      checkTimeOverlap();
     });
   });
 
@@ -1243,8 +1247,12 @@
     const mins = parseTimeToMinutes(time);
     if (mins === null) { timeWarning.classList.remove("show"); return; }
     const targetIdx = blockIdxForMinutes(mins);
-    const clash = quests[targetIdx].items.some(i => i.time === time && i.id !== editingItemId);
-    timeWarning.textContent = clash ? "⚠ Ya tienes otra actividad a esta hora en ese bloque." : "";
+    const clash = quests[targetIdx].items.some(i => {
+      if (i.time !== time || i.id === editingItemId) return false;
+      const otherDays = (i.days && i.days.length) ? i.days : ALL_DAYS;
+      return selectedDays.some(d => otherDays.includes(d));
+    });
+    timeWarning.textContent = clash ? "⚠ Ya tienes otra actividad a esta hora, en un día en común, en ese bloque." : "";
     timeWarning.classList.toggle("show", clash);
   }
   fieldTime.addEventListener("input", checkTimeOverlap);
@@ -1258,7 +1266,7 @@
       fieldNote.value = "";
       selectedType = ctx.presetType || "normal";
       selectedPriority = "opcional";
-      selectedDays = ALL_DAYS.slice();
+      selectedDays = ctx.presetDays ? ctx.presetDays.slice() : ALL_DAYS.slice();
       fieldBonus.checked = false;
       editingItemId = null;
       modalDeleteRow.style.display = "none";
@@ -1726,7 +1734,7 @@
   document.getElementById("fabQuick").addEventListener("click", () => {
     const time = nowHHMM();
     const blockIdx = blockIdxForMinutes(parseTimeToMinutes(time));
-    openModal({ blockIdx, isNew: true, presetType: "imprevisto", presetTime: time });
+    openModal({ blockIdx, isNew: true, presetType: "imprevisto", presetTime: time, presetDays: [new Date().getDay()] });
   });
 
   document.getElementById("backupExportBtn").addEventListener("click", () => {
@@ -1847,15 +1855,18 @@
   document.getElementById("clearActivitiesBtn").addEventListener("click", () => {
     const ok = confirm("Esto borra todas tus actividades excepto Despertar y Dormir. ¿Continuar?");
     if (!ok) return;
-    const wake = DEFAULT_QUESTS[0].items.find(i => i.id === "wake");
-    const sleepBlockIdx = DEFAULT_QUESTS.length - 1;
-    const sleep = DEFAULT_QUESTS[sleepBlockIdx].items.find(i => i.id === "sleep");
-    quests = quests.map((block, idx) => {
-      const items = [];
-      if (idx === 0 && wake) items.push(JSON.parse(JSON.stringify(wake)));
-      if (idx === sleepBlockIdx && sleep) items.push(JSON.parse(JSON.stringify(sleep)));
-      return { block: block.block, glyph: block.glyph, items };
-    });
+    function findWithBlock(id) {
+      for (let b = 0; b < quests.length; b++) {
+        const it = quests[b].items.find(i => i.id === id);
+        if (it) return { item: JSON.parse(JSON.stringify(it)), blockIdx: b };
+      }
+      return null;
+    }
+    const wakeFound = findWithBlock("wake");
+    const sleepFound = findWithBlock("sleep");
+    quests = quests.map(block => ({ block: block.block, glyph: block.glyph, items: [] }));
+    if (wakeFound) quests[wakeFound.blockIdx].items.push(wakeFound.item);
+    if (sleepFound) quests[sleepFound.blockIdx].items.push(sleepFound.item);
     state = { date: todayKey(), done: {} };
     saveQuests(quests);
     saveState(state);
@@ -2004,7 +2015,7 @@
       if (text) notes[todayKey()] = text; else delete notes[todayKey()];
       // keep roughly a year of notes
       const keys = Object.keys(notes).sort();
-      if (keys.length > 370) delete notes[keys[0]];
+      while (keys.length > 370) delete notes[keys.shift()];
       saveNotes(notes);
     }, 500);
   });
