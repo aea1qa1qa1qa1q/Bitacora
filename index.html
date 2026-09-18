@@ -591,9 +591,42 @@
     line-height: 1;
   }
   .fab:active { transform: scale(0.95); }
+
+  .menu-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .menu-item {
+    text-align: left;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-family: var(--font-display);
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .menu-item.danger { color: var(--danger); border-color: rgba(217,112,90,0.35); }
+  .check-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .check-row label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13.5px;
+    color: var(--text-dim);
+  }
+  .check-row input { width: 17px; height: 17px; accent-color: var(--teal); }
 </style>
 </head>
 <body>
+<button class="edit-toggle" id="menuToggle" style="right: 94px;" aria-label="Menú">☰</button>
 <button class="edit-toggle" id="editToggle" aria-label="Editar">✎</button>
 <button class="theme-toggle" id="themeToggle" aria-label="Cambiar tema">◐</button>
 <div class="wrap">
@@ -633,18 +666,46 @@
   </div>
 
   <footer>
-    <button class="reset-btn" id="resetBtn">reiniciar hoy</button>
-    <button class="reset-btn" id="copyYesterdayBtn" style="margin-left:8px;">marcar todo como ayer</button>
-    <button class="reset-btn" id="exportBtn" style="margin-left:8px;">exportar historial (.csv)</button>
-    <br>
-    <button class="reset-btn" id="backupExportBtn" style="margin-top:8px;">backup completo (.json)</button>
-    <button class="reset-btn" id="backupImportBtn" style="margin-left:8px; margin-top:8px;">restaurar backup</button>
-    <input type="file" id="backupFileInput" accept="application/json" style="display:none;">
     <div class="date-note" id="dateNote"></div>
   </footer>
 </div>
 
 <button class="fab" id="fabQuick" aria-label="Surgió algo">+</button>
+
+<div class="modal-backdrop" id="menuBackdrop">
+  <div class="modal">
+    <h3>Menú</h3>
+    <div class="menu-list">
+      <button class="menu-item" id="resetBtn">Reiniciar hoy</button>
+      <button class="menu-item" id="copyYesterdayBtn">Marcar todo como ayer</button>
+      <button class="menu-item" id="exportBtn">Exportar historial (.csv)</button>
+      <button class="menu-item" id="backupExportBtn">Backup completo (.json)</button>
+      <button class="menu-item" id="backupImportBtn">Restaurar backup</button>
+      <input type="file" id="backupFileInput" accept="application/json" style="display:none;">
+      <button class="menu-item danger" id="clearActivitiesBtn">Limpiar actividades</button>
+      <button class="menu-item danger" id="restoreDefaultBtn">Restaurar valores por defecto</button>
+    </div>
+    <h3 style="margin-top:20px;">Mensaje al completar el día</h3>
+    <div class="check-row">
+      <label><input type="checkbox" id="prefMotivadora"> Frase motivadora</label>
+      <label><input type="checkbox" id="prefCurioso"> Dato curioso</label>
+      <label><input type="checkbox" id="prefChiste"> Chiste</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-save" id="menuClose" style="flex:1;">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="completeBackdrop">
+  <div class="modal">
+    <h3 id="completeTitle">¡Día completado!</h3>
+    <p id="completeText" style="color:var(--text-dim); font-size:14px; line-height:1.5; margin:0 0 16px;"></p>
+    <div class="modal-actions">
+      <button class="btn-save" id="completeClose" style="flex:1;">Cerrar</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-backdrop" id="modalBackdrop">
   <div class="modal">
@@ -745,7 +806,13 @@
 
   function makeId() { return "q" + Date.now() + Math.floor(Math.random() * 1000); }
 
-  const todayKey = () => new Date().toISOString().slice(0, 10);
+  function localDateKey(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  const todayKey = () => localDateKey(new Date());
   const QUESTS_KEY = "quest-log-quests";
   const STORE_KEY = "quest-log-state";
   const STREAK_KEY = "quest-log-streak";
@@ -1108,6 +1175,7 @@
     const allDone = total > 0 && done === total;
     const streak = updateStreak(allDone);
     document.getElementById("streakN").textContent = (streak > 0 ? "🔥 " : "") + streak;
+    maybeShowCompletion(allDone);
 
     renderHistory(done, total);
     renderCalendar(done, total);
@@ -1131,7 +1199,7 @@
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
+      const key = localDateKey(d);
       days.push(key);
     }
     const dayLetters = ["D","L","M","M","J","V","S"];
@@ -1186,7 +1254,7 @@
     }
     for (let d = 1; d <= daysInMonth; d++) {
       const dateObj = new Date(year, month, d);
-      const key = dateObj.toISOString().slice(0, 10);
+      const key = localDateKey(dateObj);
       const entry = map[key];
       const cell = document.createElement("div");
       let cls = "cal-cell";
@@ -1231,7 +1299,7 @@
   document.getElementById("copyYesterdayBtn").addEventListener("click", () => {
     const y = new Date();
     y.setDate(y.getDate() - 1);
-    const yKey = y.toISOString().slice(0, 10);
+    const yKey = localDateKey(y);
     const history = loadHistory();
     const entry = history.find(h => h.date === yKey);
     if (!entry || !entry.doneIds) {
@@ -1351,6 +1419,108 @@
     reader.readAsText(file);
   });
 
+  // Menu panel
+  const menuBackdrop = document.getElementById("menuBackdrop");
+  document.getElementById("menuToggle").addEventListener("click", () => menuBackdrop.classList.add("show"));
+  document.getElementById("menuClose").addEventListener("click", () => menuBackdrop.classList.remove("show"));
+  menuBackdrop.addEventListener("click", (e) => { if (e.target === menuBackdrop) menuBackdrop.classList.remove("show"); });
+
+  document.getElementById("clearActivitiesBtn").addEventListener("click", () => {
+    const ok = confirm("Esto borra todas tus actividades excepto Despertar y Dormir. ¿Continuar?");
+    if (!ok) return;
+    const wake = DEFAULT_QUESTS[0].items.find(i => i.id === "wake");
+    const sleepBlockIdx = DEFAULT_QUESTS.length - 1;
+    const sleep = DEFAULT_QUESTS[sleepBlockIdx].items.find(i => i.id === "sleep");
+    quests = quests.map((block, idx) => {
+      const items = [];
+      if (idx === 0 && wake) items.push(JSON.parse(JSON.stringify(wake)));
+      if (idx === sleepBlockIdx && sleep) items.push(JSON.parse(JSON.stringify(sleep)));
+      return { block: block.block, glyph: block.glyph, items };
+    });
+    state = { date: todayKey(), done: {} };
+    saveQuests(quests);
+    saveState(state);
+    totalCount = quests.reduce((n, b) => n + b.items.filter(i => i.type !== "protegida").length, 0);
+    menuBackdrop.classList.remove("show");
+    render();
+  });
+
+  document.getElementById("restoreDefaultBtn").addEventListener("click", () => {
+    const ok = confirm("Esto reemplaza tus actividades actuales con la rutina original de ejemplo. ¿Continuar?");
+    if (!ok) return;
+    quests = JSON.parse(JSON.stringify(DEFAULT_QUESTS));
+    saveQuests(quests);
+    totalCount = quests.reduce((n, b) => n + b.items.filter(i => i.type !== "protegida").length, 0);
+    menuBackdrop.classList.remove("show");
+    render();
+  });
+
+  // Completion message on finishing the day
+  const PHRASES = {
+    motivadora: [
+      "Otro día completado. Así se construyen las rachas.",
+      "No fue perfecto, fue mejor: fue constante.",
+      "Tu yo de mañana te lo va a agradecer.",
+      "Pequeñas victorias, grandes resultados.",
+      "Hoy elegiste disciplina. Eso cuenta.",
+    ],
+    curioso: [
+      "Dato curioso: el corazón humano late unas 100,000 veces al día.",
+      "Dato curioso: los músculos se reparan mientras duermes, no mientras entrenas.",
+      "Dato curioso: el plátano es primo botánico de la hierba, no de un árbol.",
+      "Dato curioso: el cuerpo humano tiene más de 600 músculos.",
+      "Dato curioso: dormir bien mejora la memoria casi tanto como estudiar.",
+    ],
+    chiste: [
+      "¿Por qué el huevo no se estresa? Porque siempre tiene la yema bajo control.",
+      "¿Cómo motiva un átomo a otro? No hay presión.",
+      "¿Por qué el pollo fue al gym? Para dejar de ser pechuga floja.",
+      "¿Qué le dice una pesa a otra? Nos vemos mañana, sin falta.",
+      "¿Por qué el reloj del gym siempre tiene hambre? Porque marca las horas pico.",
+    ],
+  };
+  const COMPLETE_PREFS_KEY = "quest-log-complete-prefs";
+  function loadCompletePrefs() {
+    const raw = safeGet(COMPLETE_PREFS_KEY);
+    if (!raw) return ["motivadora", "curioso", "chiste"]; // default: all on
+    try { return JSON.parse(raw); } catch (e) { return ["motivadora", "curioso", "chiste"]; }
+  }
+  function saveCompletePrefs(p) { safeSet(COMPLETE_PREFS_KEY, JSON.stringify(p)); }
+
+  const prefBoxes = {
+    motivadora: document.getElementById("prefMotivadora"),
+    curioso: document.getElementById("prefCurioso"),
+    chiste: document.getElementById("prefChiste"),
+  };
+  (function initPrefBoxes() {
+    const prefs = loadCompletePrefs();
+    Object.keys(prefBoxes).forEach(k => { prefBoxes[k].checked = prefs.includes(k); });
+    Object.keys(prefBoxes).forEach(k => {
+      prefBoxes[k].addEventListener("change", () => {
+        const active = Object.keys(prefBoxes).filter(key => prefBoxes[key].checked);
+        saveCompletePrefs(active);
+      });
+    });
+  })();
+
+  function maybeShowCompletion(allDoneNow) {
+    const flagKey = "quest-log-complete-shown";
+    if (!allDoneNow) return;
+    if (safeGet(flagKey) === todayKey()) return;
+    const prefs = loadCompletePrefs();
+    if (prefs.length === 0) { safeSet(flagKey, todayKey()); return; }
+    const category = prefs[Math.floor(Math.random() * prefs.length)];
+    const pool = PHRASES[category] || [];
+    if (pool.length === 0) { safeSet(flagKey, todayKey()); return; }
+    const phrase = pool[Math.floor(Math.random() * pool.length)];
+    document.getElementById("completeText").textContent = phrase;
+    document.getElementById("completeBackdrop").classList.add("show");
+    safeSet(flagKey, todayKey());
+  }
+  document.getElementById("completeClose").addEventListener("click", () => {
+    document.getElementById("completeBackdrop").classList.remove("show");
+  });
+
   // Weekly summary — shown once, automatically, each Sunday
   function maybeShowWeeklySummary() {
     if (new Date().getDay() !== 0) return; // only Sundays
@@ -1367,7 +1537,7 @@
     for (let i = 0; i < 7; i++) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      days.push(d.toISOString().slice(0, 10));
+      days.push(localDateKey(d));
     }
     let completedDays = 0, trackedDays = 0;
     days.forEach(key => {
