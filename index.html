@@ -2,10 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Bitácora del día</title>
+<meta name="description" content="Rutina diaria por bloques con racha, historial y notas. Funciona sin conexión.">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#11141c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bitácora">
+<link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,7 +32,7 @@
     --teal: #4fb8a8;
     --danger: #d9705a;
     --font-display: 'Space Grotesk', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   }
   :root:not([data-theme="light"]) { color-scheme: dark; }
   :root[data-theme="light"] {
@@ -71,19 +77,55 @@
     color: var(--text);
     font-family: var(--font-display);
     -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     min-height: 100vh;
-    padding: 28px 16px 90px;
+    padding: calc(18px + env(safe-area-inset-top)) 16px calc(100px + env(safe-area-inset-bottom));
     background-image: radial-gradient(circle at 15% 0%, rgba(224,176,78,0.06), transparent 45%),
                        radial-gradient(circle at 100% 20%, rgba(79,184,168,0.05), transparent 40%);
     background-attachment: fixed;
   }
+  body.modal-open { overflow: hidden; }
   .wrap { max-width: 560px; margin: 0 auto; }
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
   @keyframes cardIn {
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes sheetIn {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.18); }
+    100% { transform: scale(1); }
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .tools { display: flex; gap: 8px; }
+  .tool-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    border-radius: 8px;
+    width: 34px; height: 34px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+  }
+  .tool-btn:hover { color: var(--text); }
+  .tool-btn.active {
+    color: var(--gold);
+    border-color: var(--gold-dim);
   }
 
   header {
@@ -100,7 +142,6 @@
     font-size: 12px;
     letter-spacing: 0.08em;
     color: var(--text-faint);
-    margin-bottom: 4px;
   }
   h1 {
     font-size: 26px;
@@ -118,6 +159,7 @@
     color: var(--gold);
     line-height: 1;
   }
+  .streak .n.pop { animation: pop 0.45s ease; }
   .streak .l {
     font-size: 10.5px;
     color: var(--text-faint);
@@ -160,6 +202,19 @@
     white-space: nowrap;
   }
 
+  .edit-banner, .empty-hint {
+    display: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.5;
+    border-radius: 8px;
+    padding: 9px 11px;
+    margin: -8px 0 20px;
+  }
+  .edit-banner { color: var(--gold); border: 1px dashed var(--gold-dim); }
+  .empty-hint { color: var(--text-dim); border: 1px dashed var(--border); }
+  .edit-banner.show, .empty-hint.show { display: block; }
+
   .block {
     margin-bottom: 22px;
     transition: opacity 0.4s ease, filter 0.4s ease;
@@ -195,6 +250,13 @@
     font-size: 11px;
     color: var(--text-faint);
   }
+  .block-head .count {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+  .block-head .count.full { color: var(--teal); }
 
   .card {
     display: flex;
@@ -208,10 +270,12 @@
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
     user-select: none;
+    -webkit-user-select: none;
     box-shadow: 0 1px 3px rgba(0,0,0,0.12);
   }
   .wrap { animation: cardIn 0.35s ease both; }
   .card:active { transform: scale(0.995); }
+  .card:focus-visible { outline-offset: 1px; }
   .card.done {
     background: var(--bg-card-done);
     border-color: var(--border-done);
@@ -231,6 +295,7 @@
     background: var(--teal);
     border-color: var(--teal);
   }
+  .card.just-done .box { animation: pop 0.3s ease; }
   .box svg { width: 13px; height: 13px; opacity: 0; transition: opacity 0.1s ease; }
   .card.done .box svg { opacity: 1; }
 
@@ -239,6 +304,7 @@
     font-size: 14.5px;
     font-weight: 500;
     line-height: 1.3;
+    overflow-wrap: anywhere;
   }
   .card.done .card-title {
     color: var(--text-faint);
@@ -251,26 +317,9 @@
     color: var(--text-faint);
     margin-top: 2px;
   }
+  .card-time .moved { color: var(--gold); }
 
-  .locked {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: var(--bg-elev);
-    border: 1px dashed var(--border);
-    border-radius: 10px;
-    padding: 13px 14px;
-  }
-  .locked .card-title { color: var(--gold); font-weight: 500; }
-  .locked .card-time { color: var(--gold-dim); }
-  .locked .box {
-    border-color: var(--gold-dim);
-    color: var(--gold);
-    font-family: var(--font-mono);
-    font-size: 13px;
-  }
-
-  /* protected-type activity: same locked look, but lives in the normal card flow so it's editable */
+  /* protected-type activity: dashed, gold, not toggleable */
   .card.type-protegida {
     background: var(--bg-elev);
     border-style: dashed;
@@ -317,59 +366,23 @@
     color: var(--gold);
     background: rgba(224,176,78,0.08);
   }
+  .field-hint {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-faint);
+    margin-top: 6px;
+    line-height: 1.45;
+  }
 
   footer {
     margin-top: 28px;
     text-align: center;
   }
-  .reset-btn {
-    font-family: var(--font-mono);
-    font-size: 11.5px;
-    color: var(--text-faint);
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 7px 16px;
-    cursor: pointer;
-    transition: color 0.15s ease, border-color 0.15s ease;
-  }
-  .reset-btn:hover { color: var(--danger); border-color: var(--danger); }
   .date-note {
     font-family: var(--font-mono);
     font-size: 10.5px;
     color: var(--text-faint);
     margin-top: 10px;
-  }
-
-  .theme-toggle {
-    position: fixed;
-    top: 14px; right: 14px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    border-radius: 8px;
-    width: 32px; height: 32px;
-    font-size: 14px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    z-index: 60;
-  }
-  .edit-toggle {
-    position: fixed;
-    top: 14px; right: 54px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    border-radius: 8px;
-    width: 32px; height: 32px;
-    font-size: 13px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    z-index: 60;
-  }
-  .edit-toggle.active {
-    color: var(--gold);
-    border-color: var(--gold-dim);
   }
 
   .card.editing { cursor: default; }
@@ -386,7 +399,8 @@
   }
   .card.editmode .quick-actions { display: none; }
   .postpone-btn {
-    width: 24px; height: 24px;
+    width: 30px; height: 30px;
+    margin: -4px -6px -4px 0;
     border-radius: 6px;
     border: none;
     background: none;
@@ -397,7 +411,7 @@
   }
   .postpone-btn:hover { color: var(--gold); }
   .icon-btn {
-    width: 26px; height: 26px;
+    width: 28px; height: 28px;
     border-radius: 6px;
     border: 1px solid var(--border);
     background: var(--bg-elev);
@@ -406,7 +420,6 @@
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
   }
-  .icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
   .icon-btn[disabled] { opacity: 0.3; cursor: default; }
 
   .add-row {
@@ -443,15 +456,28 @@
     border-radius: 16px 16px 0 0;
     width: 100%;
     max-width: 560px;
-    padding: 20px 18px 24px;
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 20px 18px calc(24px + env(safe-area-inset-bottom));
+    animation: sheetIn 0.22s ease both;
   }
   .modal h3 {
     font-size: 15px;
     margin: 0 0 14px;
     color: var(--text);
   }
+  .modal h3.sub { margin-top: 20px; }
+  .modal-text {
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0 0 16px;
+    white-space: pre-line;
+  }
   .field { margin-bottom: 12px; }
-  .field label {
+  .field > label {
     display: block;
     font-family: var(--font-mono);
     font-size: 10.5px;
@@ -459,7 +485,7 @@
     margin-bottom: 5px;
     letter-spacing: 0.03em;
   }
-  .field input {
+  .field input[type="text"], .field input[type="time"] {
     width: 100%;
     background: var(--bg-elev);
     border: 1px solid var(--border);
@@ -467,7 +493,7 @@
     padding: 10px 11px;
     color: var(--text);
     font-family: var(--font-display);
-    font-size: 14px;
+    font-size: 16px;
   }
   .field input:focus { outline: none; border-color: var(--gold-dim); }
   .native-select {
@@ -478,7 +504,7 @@
     padding: 10px 11px;
     color: var(--text);
     font-family: var(--font-display);
-    font-size: 13.5px;
+    font-size: 16px;
   }
   .native-select:focus { outline: none; border-color: var(--gold-dim); }
   .modal-actions {
@@ -510,28 +536,29 @@
     font-family: var(--font-mono);
     font-size: 11px;
     color: var(--text-faint);
-    margin-bottom: 8px;
   }
   .history-row {
     display: flex;
     gap: 6px;
   }
-  .history-cell {
-    flex: 1;
+  .history-cell, .cal-cell {
     aspect-ratio: 1;
     border-radius: 6px;
     background: var(--bg-elev);
     border: 1px solid var(--border);
     display: flex; align-items: center; justify-content: center;
     font-family: var(--font-mono);
-    font-size: 9px;
     color: var(--text-faint);
+    padding: 0;
+    cursor: pointer;
   }
-  .history-cell.complete { background: var(--teal); border-color: var(--teal); color: #0c1613; }
-  .history-cell.partial { background: var(--gold-dim); border-color: var(--gold-dim); color: #23190a; }
-  .history-cell.today { border-color: var(--gold); border-width: 1.5px; }
-  .history-cell.has-note { position: relative; }
-  .history-cell.has-note::after {
+  .history-cell { flex: 1; font-size: 9px; }
+  .cal-cell { font-size: 10px; }
+  .history-cell.complete, .cal-cell.complete { background: var(--teal); border-color: var(--teal); color: #0c1613; }
+  .history-cell.partial, .cal-cell.partial { background: var(--gold-dim); border-color: var(--gold-dim); color: #23190a; }
+  .history-cell.today, .cal-cell.today { border-color: var(--gold); border-width: 1.5px; }
+  .history-cell.has-note, .cal-cell.has-note { position: relative; }
+  .history-cell.has-note::after, .cal-cell.has-note::after {
     content: "";
     position: absolute;
     bottom: 2px; right: 2px;
@@ -539,12 +566,15 @@
     border-radius: 50%;
     background: var(--gold);
   }
+  .cal-cell.empty { background: none; border: none; cursor: default; }
+  .cal-cell.future { cursor: default; opacity: 0.55; }
 
   .history-head-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 8px;
+    gap: 8px;
   }
   .cal-toggle {
     font-family: var(--font-mono);
@@ -553,7 +583,7 @@
     background: none;
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 3px 10px;
+    padding: 4px 10px;
     cursor: pointer;
   }
   .cal-toggle.active { color: var(--gold); border-color: var(--gold-dim); }
@@ -573,9 +603,10 @@
     border: 1px solid var(--border);
     color: var(--text-dim);
     border-radius: 6px;
-    width: 26px; height: 26px;
+    width: 28px; height: 28px;
     cursor: pointer;
   }
+  .cal-nav button[disabled] { opacity: 0.3; cursor: default; }
   .cal-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -587,29 +618,6 @@
     font-size: 9px;
     color: var(--text-faint);
     padding-bottom: 2px;
-  }
-  .cal-cell {
-    aspect-ratio: 1;
-    border-radius: 6px;
-    background: var(--bg-elev);
-    border: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    color: var(--text-faint);
-  }
-  .cal-cell.empty { background: none; border: none; }
-  .cal-cell.complete { background: var(--teal); border-color: var(--teal); color: #0c1613; }
-  .cal-cell.partial { background: var(--gold-dim); border-color: var(--gold-dim); color: #23190a; }
-  .cal-cell.today { border-color: var(--gold); border-width: 1.5px; }
-  .cal-cell.has-note { position: relative; }
-  .cal-cell.has-note::after {
-    content: "";
-    position: absolute;
-    bottom: 1px; right: 1px;
-    width: 4px; height: 4px;
-    border-radius: 50%;
-    background: var(--gold);
   }
   .field-warning {
     display: none;
@@ -623,7 +631,7 @@
   .fab {
     position: fixed;
     right: 18px;
-    bottom: 22px;
+    bottom: calc(22px + env(safe-area-inset-bottom));
     width: 54px; height: 54px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--teal), var(--gold));
@@ -668,8 +676,9 @@
     gap: 9px;
     font-size: 13.5px;
     color: var(--text-dim);
+    cursor: pointer;
   }
-  .check-row input { width: 17px; height: 17px; accent-color: var(--teal); }
+  .check-row input { width: 17px; height: 17px; accent-color: var(--teal); flex-shrink: 0; }
 
   .day-select {
     display: flex;
@@ -705,20 +714,17 @@
   .card.type-bonus { border-left: 3px dotted var(--teal); }
   .card.type-bonus .card-title::before { content: "☆ "; color: var(--teal); }
 
-  .days-badge {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    color: var(--text-faint);
-  }
-
   .daynote { margin: 22px 0 4px; }
   .daynote-label {
-    display: block;
+    display: flex;
+    justify-content: space-between;
     font-family: var(--font-mono);
     font-size: 11px;
     color: var(--text-faint);
     margin-bottom: 8px;
   }
+  .daynote-label .saved { color: var(--teal); opacity: 0; transition: opacity 0.3s ease; }
+  .daynote-label .saved.show { opacity: 1; }
   .daynote textarea {
     width: 100%;
     min-height: 60px;
@@ -728,7 +734,7 @@
     padding: 12px 13px;
     color: var(--text);
     font-family: var(--font-display);
-    font-size: 13.5px;
+    font-size: 16px;
     resize: vertical;
   }
   .daynote textarea:focus { outline: none; border-color: var(--gold-dim); }
@@ -745,22 +751,177 @@
     width: 11px; height: 11px;
     border-radius: 2px;
     background: var(--bg-elev);
+    cursor: pointer;
   }
   .heat-cell.l1 { background: rgba(79,184,168,0.25); }
   .heat-cell.l2 { background: rgba(79,184,168,0.5); }
   .heat-cell.l3 { background: rgba(79,184,168,0.75); }
   .heat-cell.l4 { background: var(--teal); }
   .heat-cell.today { outline: 1.5px solid var(--gold); outline-offset: 1px; }
+  .heat-legend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 3px;
+    margin-top: 6px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--text-faint);
+  }
+  .heat-legend .heat-cell { cursor: default; }
+  .heat-legend span { margin: 0 4px; }
+
+  /* day detail + stats */
+  .detail-summary {
+    color: var(--gold);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    margin: 2px 0 12px;
+  }
+  .detail-list {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--text-dim);
+    max-height: 240px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .detail-list .ok { color: var(--teal); margin-right: 6px; }
+  .detail-note {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-left: 2px solid var(--gold-dim);
+    background: var(--bg-elev);
+    border-radius: 0 8px 8px 0;
+    color: var(--text-dim);
+    font-size: 13.5px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .stat {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 12px;
+  }
+  .stat-n {
+    font-family: var(--font-mono);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--gold);
+    line-height: 1.1;
+  }
+  .stat-l {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-faint);
+    margin-top: 3px;
+  }
+  .stat-section {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    margin: 18px 0 8px;
+  }
+  .wbar {
+    display: grid;
+    grid-template-columns: 18px 1fr 38px;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+  }
+  .wbar .track {
+    height: 8px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .wbar .fill { height: 100%; background: var(--teal); }
+  .wbar .pct { text-align: right; }
+  .top-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13.5px;
+    color: var(--text-dim);
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .top-row:last-child { border-bottom: none; }
+  .top-row .c { font-family: var(--font-mono); color: var(--gold); flex-shrink: 0; }
+  .muted {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(90px + env(safe-area-inset-bottom));
+    transform: translate(-50%, 16px);
+    opacity: 0;
+    pointer-events: none;
+    background: var(--bg-card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 13.5px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    z-index: 70;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    width: max-content;
+    max-width: calc(100% - 32px);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  .toast button {
+    background: none;
+    border: none;
+    color: var(--teal);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 0;
+    flex-shrink: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 </style>
 </head>
 <body>
-<button class="edit-toggle" id="menuToggle" style="right: 94px;" aria-label="Menú">☰</button>
-<button class="edit-toggle" id="editToggle" aria-label="Editar">✎</button>
-<button class="theme-toggle" id="themeToggle" aria-label="Cambiar tema">◐</button>
 <div class="wrap">
+  <div class="topbar">
+    <div class="kicker" id="kicker">BITÁCORA · HOY</div>
+    <div class="tools">
+      <button class="tool-btn" id="menuToggle" aria-label="Menú" title="Menú">☰</button>
+      <button class="tool-btn" id="editToggle" aria-label="Editar actividades" aria-pressed="false" title="Editar actividades">✎</button>
+      <button class="tool-btn" id="themeToggle" aria-label="Cambiar tema">◐</button>
+    </div>
+  </div>
   <header>
     <div class="title">
-      <div class="kicker">BITÁCORA · HOY</div>
       <h1 id="dayName">Cargando…</h1>
     </div>
     <div class="streak">
@@ -770,11 +931,14 @@
   </header>
 
   <div class="progress-row">
-    <div class="bar"><div class="bar-fill" id="barFill"></div></div>
+    <div class="bar" role="progressbar" aria-label="Progreso del día" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar"><div class="bar-fill" id="barFill"></div></div>
     <div class="progress-label" id="progressLabel">0/0</div>
   </div>
   <div class="critical-row">Críticas: <span class="n" id="criticalLabel">0/0</span></div>
   <div class="critical-row" id="bonusRow" style="display:none;">Bonus: <span class="n" id="bonusLabel">0/0</span></div>
+
+  <div class="edit-banner" id="editBanner">MODO EDICIÓN · ves las actividades de todos los días. Toca ✎ en una actividad para editarla, o ✎ arriba para salir.</div>
+  <div class="empty-hint" id="emptyHint">No hay actividades para hoy. Toca ✎ arriba para agregar tu rutina, o + si surgió algo.</div>
 
   <div id="blocks"></div>
 
@@ -782,26 +946,31 @@
     <div class="history-head-row">
       <div class="history-head">ÚLTIMOS 7 DÍAS</div>
       <div>
-        <button class="cal-toggle" id="calToggle">ver mes ▾</button>
-        <button class="cal-toggle" id="heatToggle">ver año ▾</button>
+        <button class="cal-toggle" id="calToggle" aria-expanded="false">ver mes ▾</button>
+        <button class="cal-toggle" id="heatToggle" aria-expanded="false">ver año ▾</button>
       </div>
     </div>
     <div class="history-row" id="historyRow"></div>
     <div class="calendar" id="calendar">
       <div class="cal-nav">
-        <button id="calPrev">‹</button>
+        <button id="calPrev" aria-label="Mes anterior">‹</button>
         <span id="calLabel">—</span>
-        <button id="calNext">›</button>
+        <button id="calNext" aria-label="Mes siguiente">›</button>
       </div>
       <div class="cal-grid" id="calGrid"></div>
     </div>
     <div class="calendar" id="heatmap">
-      <div class="heat-scroll"><div class="heat-grid" id="heatGrid"></div></div>
+      <div class="heat-scroll" id="heatScroll"><div class="heat-grid" id="heatGrid"></div></div>
+      <div class="heat-legend">
+        <span>menos</span>
+        <div class="heat-cell"></div><div class="heat-cell l1"></div><div class="heat-cell l2"></div><div class="heat-cell l3"></div><div class="heat-cell l4"></div>
+        <span>más</span>
+      </div>
     </div>
   </div>
 
   <div class="daynote">
-    <label class="daynote-label" for="dayNoteField">NOTA DEL DÍA</label>
+    <label class="daynote-label" for="dayNoteField"><span>NOTA DEL DÍA</span><span class="saved" id="noteSaved">guardado ✓</span></label>
     <textarea id="dayNoteField" placeholder="¿Cómo te fue hoy?"></textarea>
   </div>
 
@@ -810,62 +979,104 @@
   </footer>
 </div>
 
-<button class="fab" id="fabQuick" aria-label="Surgió algo">+</button>
+<button class="fab" id="fabQuick" aria-label="Surgió algo (imprevisto)" title="Surgió algo">+</button>
+
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <span id="toastText"></span>
+  <button id="toastUndo">DESHACER</button>
+</div>
 
 <div class="modal-backdrop" id="menuBackdrop">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Menú">
     <h3>Menú</h3>
     <div class="menu-list">
+      <button class="menu-item" id="statsBtn">Estadísticas</button>
+      <button class="menu-item" id="activityHistoryBtn">Ver historial de una actividad</button>
+      <button class="menu-item" id="copyYesterdayBtn">Marcar lo mismo que ayer</button>
       <button class="menu-item" id="resetBtn">Reiniciar hoy</button>
-      <button class="menu-item" id="copyYesterdayBtn">Marcar todo como ayer</button>
       <button class="menu-item" id="exportBtn">Exportar historial (.csv)</button>
       <button class="menu-item" id="backupExportBtn">Backup completo (.json)</button>
       <button class="menu-item" id="backupImportBtn">Restaurar backup</button>
-      <input type="file" id="backupFileInput" accept="application/json" style="display:none;">
-      <button class="menu-item" id="activityHistoryBtn">Ver historial de una actividad</button>
+      <input type="file" id="backupFileInput" accept="application/json,.json" style="display:none;">
       <button class="menu-item danger" id="clearActivitiesBtn">Limpiar actividades</button>
       <button class="menu-item danger" id="restoreDefaultBtn">Restaurar valores por defecto</button>
     </div>
-    <h3 style="margin-top:20px;">Mensaje al completar el día</h3>
+    <h3 class="sub">Mensaje al completar el día</h3>
     <div class="check-row">
       <label><input type="checkbox" id="prefMotivadora"> Frase motivadora</label>
       <label><input type="checkbox" id="prefCurioso"> Dato curioso</label>
       <label><input type="checkbox" id="prefChiste"> Chiste</label>
+    </div>
+    <h3 class="sub">Preferencias</h3>
+    <div class="check-row">
       <label><input type="checkbox" id="prefSound"> Sonido y vibración al marcar</label>
+      <label><input type="checkbox" id="prefLateDay"> La madrugada (hasta las 5:00 am) cuenta como el día anterior</label>
     </div>
     <div class="modal-actions">
-      <button class="btn-save" id="menuClose" style="flex:1;">Cerrar</button>
+      <button class="btn-save" id="menuClose">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="statsBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+    <h3 id="statsTitle">Estadísticas</h3>
+    <div id="statsBody"></div>
+    <div class="modal-actions">
+      <button class="btn-save" data-close>Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="dayBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dayTitle">
+    <h3 id="dayTitle">Día</h3>
+    <p class="detail-summary" id="daySummary"></p>
+    <div class="detail-list" id="dayList"></div>
+    <div class="detail-note" id="dayNote" style="display:none;"></div>
+    <div class="modal-actions">
+      <button class="btn-save" data-close>Cerrar</button>
     </div>
   </div>
 </div>
 
 <div class="modal-backdrop" id="activityHistoryBackdrop">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Historial de actividad">
     <h3>Historial de actividad</h3>
     <div class="field">
-      <label>Actividad</label>
+      <label for="activityHistorySelect">Actividad</label>
       <select id="activityHistorySelect" class="native-select"></select>
     </div>
-    <p id="activityHistorySummary" style="color:var(--gold); font-family:var(--font-mono); font-size:13px; margin:2px 0 10px;"></p>
-    <div id="activityHistoryList" style="font-family:var(--font-mono); font-size:12.5px; color:var(--text-dim); max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:5px;"></div>
+    <p class="detail-summary" id="activityHistorySummary"></p>
+    <div class="detail-list" id="activityHistoryList"></div>
     <div class="modal-actions">
-      <button class="btn-save" id="activityHistoryClose" style="flex:1;">Cerrar</button>
+      <button class="btn-save" data-close>Cerrar</button>
     </div>
   </div>
 </div>
 
 <div class="modal-backdrop" id="completeBackdrop">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="completeTitle">
     <h3 id="completeTitle">¡Día completado!</h3>
-    <p id="completeText" style="color:var(--text-dim); font-size:14px; line-height:1.5; margin:0 0 16px;"></p>
+    <p class="modal-text" id="completeText"></p>
     <div class="modal-actions">
-      <button class="btn-save" id="completeClose" style="flex:1;">Cerrar</button>
+      <button class="btn-save" data-close>Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="weeklyBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Resumen de la semana">
+    <h3>Resumen de la semana</h3>
+    <p class="modal-text" id="weeklyText"></p>
+    <div class="modal-actions">
+      <button class="btn-save" data-close>Cerrar</button>
     </div>
   </div>
 </div>
 
 <div class="modal-backdrop" id="modalBackdrop">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <h3 id="modalTitle">Editar actividad</h3>
     <div class="field">
       <label>Tipo</label>
@@ -874,44 +1085,45 @@
         <button type="button" class="type-btn" data-type="protegida">Protegida</button>
         <button type="button" class="type-btn" data-type="imprevisto">Imprevisto</button>
       </div>
+      <div class="field-hint" id="typeHint"></div>
     </div>
-    <div class="field">
+    <div class="field" id="priorityField">
       <label>Prioridad</label>
       <div class="type-select" id="prioritySelect">
         <button type="button" class="type-btn" data-priority="opcional">Opcional</button>
         <button type="button" class="type-btn" data-priority="critica">Crítica</button>
       </div>
     </div>
-    <div class="field">
+    <div class="field" id="daysField">
       <label>Repetir en</label>
       <div class="day-select" id="daySelect">
-        <button type="button" class="day-btn" data-day="0">D</button>
-        <button type="button" class="day-btn" data-day="1">L</button>
-        <button type="button" class="day-btn" data-day="2">M</button>
-        <button type="button" class="day-btn" data-day="3">M</button>
-        <button type="button" class="day-btn" data-day="4">J</button>
-        <button type="button" class="day-btn" data-day="5">V</button>
-        <button type="button" class="day-btn" data-day="6">S</button>
+        <button type="button" class="day-btn" data-day="1" aria-label="Lunes">L</button>
+        <button type="button" class="day-btn" data-day="2" aria-label="Martes">M</button>
+        <button type="button" class="day-btn" data-day="3" aria-label="Miércoles">M</button>
+        <button type="button" class="day-btn" data-day="4" aria-label="Jueves">J</button>
+        <button type="button" class="day-btn" data-day="5" aria-label="Viernes">V</button>
+        <button type="button" class="day-btn" data-day="6" aria-label="Sábado">S</button>
+        <button type="button" class="day-btn" data-day="0" aria-label="Domingo">D</button>
       </div>
     </div>
-    <div class="field">
+    <div class="field" id="bonusField">
       <label class="checkbox-label"><input type="checkbox" id="fieldBonus"> Side quest (no cuenta en tu contra si no la haces)</label>
     </div>
     <div class="field">
-      <label>Actividad</label>
-      <select id="presetSelect" class="native-select">
+      <label for="fieldTitle">Actividad</label>
+      <select id="presetSelect" class="native-select" aria-label="Elegir de la lista">
         <option value="">Elegir de la lista… (opcional)</option>
       </select>
-      <input type="text" id="fieldTitle" placeholder="Ej. Estirar 10 min" style="margin-top:8px;">
+      <input type="text" id="fieldTitle" placeholder="Ej. Estirar 10 min" maxlength="120" style="margin-top:8px;" enterkeyhint="done">
     </div>
     <div class="field">
-      <label>Hora (opcional)</label>
+      <label for="fieldTime">Hora (opcional)</label>
       <input type="time" id="fieldTime">
       <div class="field-warning" id="timeWarning"></div>
     </div>
     <div class="field">
-      <label>Nota (opcional)</label>
-      <input type="text" id="fieldNote" placeholder="Ej. hasta las 7:30, antes de esta hora...">
+      <label for="fieldNote">Nota (opcional)</label>
+      <input type="text" id="fieldNote" placeholder="Ej. hasta las 7:30, antes de esta hora..." maxlength="160" enterkeyhint="done">
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" id="modalCancel">Cancelar</button>
@@ -919,16 +1131,6 @@
     </div>
     <div class="modal-actions" id="modalDeleteRow" style="display:none;">
       <button class="btn-delete-full" id="modalDelete">Eliminar actividad</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-backdrop" id="weeklyBackdrop">
-  <div class="modal">
-    <h3>Resumen de la semana</h3>
-    <p id="weeklyText" style="color:var(--text-dim); font-size:14px; line-height:1.5; margin:0 0 16px;"></p>
-    <div class="modal-actions">
-      <button class="btn-save" id="weeklyClose" style="flex:1;">Cerrar</button>
     </div>
   </div>
 </div>
@@ -975,14 +1177,65 @@
     return d.getHours() * 60 + d.getMinutes();
   }
   function currentBlockIdx() { return blockIdxForMinutes(currentMinutes()); }
-  function nowHHMM() {
-    const d = new Date();
-    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
-  }
+  function nowHHMM() { return minutesTo24(currentMinutes()); }
 
   const DAY_LETTERS = ["D", "L", "M", "M", "J", "V", "S"];
+  const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const WEEKDAY_NAMES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  const MONTH_NAMES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+  const MONTH_SHORT = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+  const mondayFirst = (a, b) => ((a + 6) % 7) - ((b + 6) % 7);
 
+  const QUESTS_KEY = "quest-log-quests";
+  const STORE_KEY = "quest-log-state";
+  const STREAK_KEY = "quest-log-streak";
+  const STREAK_BEST_KEY = "quest-log-streak-best";
+  const THEME_KEY = "quest-log-theme";
+  const HISTORY_KEY = "quest-log-history"; // array of {date, done, total, doneIds, doneTitles}
+  const NOTES_KEY = "quest-log-notes";
   const SOUND_PREF_KEY = "quest-log-sound-pref";
+  const COMPLETE_PREFS_KEY = "quest-log-complete-prefs";
+  const DAY_START_KEY = "quest-log-day-start"; // "5" = the day rolls over at 5:00 am instead of midnight
+  const COMPLETE_SHOWN_KEY = "quest-log-complete-shown";
+  const WEEKLY_SHOWN_KEY = "quest-log-weekly-shown";
+
+  function safeGet(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  }
+  function safeSet(key, val) {
+    try { localStorage.setItem(key, val); } catch (e) {}
+  }
+  function escapeHtml(str) {
+    return String(str == null ? "" : str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // The "logical" day: with the late-day option on, 00:00–04:59 still belongs to the previous date.
+  function dayStartOffsetMinutes() { return safeGet(DAY_START_KEY) === "5" ? 300 : 0; }
+  function logicalNow() { return new Date(Date.now() - dayStartOffsetMinutes() * 60000); }
+  function localDateKey(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  const todayKey = () => localDateKey(logicalNow());
+  const todayDow = () => logicalNow().getDay();
+  function dateKeyDaysAgo(n) {
+    const d = logicalNow();
+    d.setDate(d.getDate() - n);
+    return localDateKey(d);
+  }
+  function dateFromKey(key) { return new Date(key + "T00:00:00"); }
+  function nextDateKey(key) {
+    const d = dateFromKey(key);
+    d.setDate(d.getDate() + 1);
+    return localDateKey(d);
+  }
+  function formatLongDate(key) {
+    const d = dateFromKey(key);
+    return `${DAY_NAMES[d.getDay()]} ${d.getDate()} de ${MONTH_NAMES[d.getMonth()].toLowerCase()}`;
+  }
+
   function soundEnabled() { return safeGet(SOUND_PREF_KEY) !== "off"; }
   let audioCtx = null;
   function beep(freq, duration, vol) {
@@ -1011,26 +1264,6 @@
 
   function makeId() { return "q" + Date.now() + Math.floor(Math.random() * 1000); }
 
-  function localDateKey(d) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  }
-  const todayKey = () => localDateKey(new Date());
-  const QUESTS_KEY = "quest-log-quests";
-  const STORE_KEY = "quest-log-state";
-  const STREAK_KEY = "quest-log-streak";
-  const THEME_KEY = "quest-log-theme";
-  const HISTORY_KEY = "quest-log-history"; // array of {date, done, total}
-
-  function safeGet(key) {
-    try { return localStorage.getItem(key); } catch (e) { return null; }
-  }
-  function safeSet(key, val) {
-    try { localStorage.setItem(key, val); } catch (e) {}
-  }
-
   function legacyParseToMinutes(str) {
     if (!str) return null;
     const m = str.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
@@ -1047,11 +1280,14 @@
     return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
   }
   function migrateItem(item) {
+    if (!item.id) item.id = makeId();
+    item.t = String(item.t || "Actividad");
     if (!item.type) item.type = "normal";
     if (item.note === undefined) item.note = "";
     if (!item.priority) item.priority = "opcional";
-    if (!item.days || !Array.isArray(item.days) || item.days.length === 0) item.days = [0, 1, 2, 3, 4, 5, 6];
+    if (!item.days || !Array.isArray(item.days) || item.days.length === 0) item.days = ALL_DAYS.slice();
     if (item.bonus === undefined) item.bonus = false;
+    if (item.time === undefined || item.time === null) item.time = "";
     // already migrated (24h HH:MM or empty)
     if (item.time === "" || /^\d{2}:\d{2}$/.test(item.time)) return item;
     // old free-text time like "6:15 am" or "antes de 6:00 pm"
@@ -1061,24 +1297,48 @@
     if (!item.note) item.note = original;
     return item;
   }
+  function isValidQuests(q) {
+    return Array.isArray(q) && q.length === BLOCK_RANGES.length && q.every(b => b && Array.isArray(b.items));
+  }
   function migrateQuests(q) {
-    q.forEach(block => { block.items = block.items.map(migrateItem); });
+    q.forEach((block, i) => {
+      block.block = block.block || DEFAULT_QUESTS[i].block;
+      block.glyph = block.glyph || DEFAULT_QUESTS[i].glyph;
+      block.items = block.items.filter(Boolean).map(migrateItem);
+    });
     return q;
   }
+  const defaultQuests = () => JSON.parse(JSON.stringify(DEFAULT_QUESTS));
 
   function loadQuests() {
     const raw = safeGet(QUESTS_KEY);
-    if (!raw) return JSON.parse(JSON.stringify(DEFAULT_QUESTS));
-    try { return migrateQuests(JSON.parse(raw)); } catch (e) { return JSON.parse(JSON.stringify(DEFAULT_QUESTS)); }
+    if (!raw) return defaultQuests();
+    try {
+      const parsed = JSON.parse(raw);
+      return isValidQuests(parsed) ? migrateQuests(parsed) : defaultQuests();
+    } catch (e) { return defaultQuests(); }
   }
   function saveQuests(q) { safeSet(QUESTS_KEY, JSON.stringify(q)); }
 
   function loadHistory() {
     const raw = safeGet(HISTORY_KEY);
     if (!raw) return [];
-    try { return JSON.parse(raw); } catch (e) { return []; }
+    try {
+      const h = JSON.parse(raw);
+      return Array.isArray(h) ? h : [];
+    } catch (e) { return []; }
   }
-  function saveHistory(h) { safeSet(HISTORY_KEY, JSON.stringify(h.slice(-370))); }
+  function saveHistory(h) {
+    h.sort((a, b) => a.date.localeCompare(b.date));
+    safeSet(HISTORY_KEY, JSON.stringify(h.slice(-370)));
+  }
+
+  function loadNotes() {
+    const raw = safeGet(NOTES_KEY);
+    if (!raw) return {};
+    try { return JSON.parse(raw) || {}; } catch (e) { return {}; }
+  }
+  function saveNotes(n) { safeSet(NOTES_KEY, JSON.stringify(n)); }
 
   function findItemById(id) {
     for (const block of quests) {
@@ -1087,62 +1347,146 @@
     }
     return null;
   }
+  function daysOf(item) { return (item.days && item.days.length) ? item.days : ALL_DAYS; }
+  // one-off items (imprevistos) carry a `date` and only exist on that day
+  function isScheduledOn(item, dow, key) {
+    if (item.date) return item.date === key;
+    return daysOf(item).includes(dow);
+  }
+  function countsTowardTotal(item) { return item.type !== "protegida" && !item.bonus; }
 
-  function archiveIfNewDay(prevState, total) {
-    if (!prevState || prevState.date === todayKey()) return;
-    const doneIds = Object.keys(prevState.done || {}).filter(k => prevState.done[k]);
+  function freshState() { return { date: todayKey(), done: {}, moved: {} }; }
+  function loadState() {
+    const raw = safeGet(STORE_KEY);
+    if (!raw) return freshState();
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed.date !== "string") return freshState();
+      parsed.done = parsed.done || {};
+      parsed.moved = parsed.moved || {};
+      return parsed;
+    } catch (e) {
+      return freshState();
+    }
+  }
+  function saveState(s) { safeSet(STORE_KEY, JSON.stringify(s)); }
+
+  // what a given date should be scored against: countable items scheduled for that day
+  function scoreDay(dateKey, doneMap) {
+    const dow = dateFromKey(dateKey).getDay();
+    let total = 0, done = 0;
+    quests.forEach(b => b.items.forEach(item => {
+      if (!countsTowardTotal(item) || !isScheduledOn(item, dow, dateKey)) return;
+      total++;
+      if (doneMap[item.id]) done++;
+    }));
+    return { total, done };
+  }
+
+  // Writes a finished day into the history.
+  function archiveDay(prev) {
+    if (!prev || !prev.date) return;
+    const doneIds = Object.keys(prev.done || {}).filter(k => prev.done[k]);
     if (doneIds.length === 0) return; // nothing to log for an untouched day
+    const { total, done } = scoreDay(prev.date, prev.done);
     const doneTitles = doneIds.map(id => {
       const item = findItemById(id);
       return item ? item.t : null;
     }).filter(Boolean);
     const history = loadHistory();
-    const existing = history.findIndex(h => h.date === prevState.date);
-    const entry = { date: prevState.date, done: doneIds.length, total, doneIds, doneTitles };
+    const existing = history.findIndex(h => h.date === prev.date);
+    const entry = { date: prev.date, done, total, doneIds, doneTitles, v: 2 };
     if (existing >= 0) history[existing] = entry; else history.push(entry);
     saveHistory(history);
   }
 
-  function loadState(total) {
-    const raw = safeGet(STORE_KEY);
-    if (!raw) return { date: todayKey(), done: {} };
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed.date !== todayKey()) {
-        archiveIfNewDay(parsed, total);
-        return { date: todayKey(), done: {} };
-      }
-      return parsed;
-    } catch (e) {
-      return { date: todayKey(), done: {} };
-    }
+  function pruneExpiredOneOffs() {
+    const key = todayKey();
+    let changed = false;
+    quests.forEach(b => {
+      const before = b.items.length;
+      b.items = b.items.filter(i => !(i.date && i.date < key));
+      if (b.items.length !== before) changed = true;
+    });
+    if (changed) saveQuests(quests);
   }
-  function saveState(s) { safeSet(STORE_KEY, JSON.stringify(s)); }
+
+  function rolloverIfNeeded() {
+    if (state.date === todayKey()) return false;
+    archiveDay(state);
+    state = freshState();
+    saveState(state);
+    pruneExpiredOneOffs();
+    return true;
+  }
+
+  function readStreak() {
+    return {
+      n: parseInt(safeGet(STREAK_KEY) || "0", 10) || 0,
+      date: safeGet(STREAK_KEY + "-date") || "",
+    };
+  }
+  function writeStreak(n, date) {
+    safeSet(STREAK_KEY, String(n));
+    safeSet(STREAK_KEY + "-date", date);
+  }
+  function bestStreakStored() { return parseInt(safeGet(STREAK_BEST_KEY) || "0", 10) || 0; }
 
   function updateStreak(allDoneNow) {
-    let streak = 0;
-    try { streak = parseInt(safeGet(STREAK_KEY) || "0", 10) || 0; } catch (e) {}
-    let lastCompleteDate = safeGet(STREAK_KEY + "-date") || "";
-    if (allDoneNow && lastCompleteDate !== todayKey()) {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const wasConsecutive = lastCompleteDate === localDateKey(yesterday);
-      streak = wasConsecutive ? streak + 1 : 1;
-      safeSet(STREAK_KEY, String(streak));
-      safeSet(STREAK_KEY + "-date", todayKey());
+    let { n, date } = readStreak();
+    const today = todayKey(), yesterday = dateKeyDaysAgo(1);
+    if (allDoneNow && date !== today) {
+      n = date === yesterday ? n + 1 : 1;
+      date = today;
+      writeStreak(n, date);
+      if (n > bestStreakStored()) safeSet(STREAK_BEST_KEY, String(n));
+      state.streakCounted = true;
+      saveState(state);
+    } else if (!allDoneNow && date === today && state.streakCounted) {
+      // today was completed and then something got unmarked: take back today's +1
+      n = Math.max(0, n - 1);
+      date = n > 0 ? yesterday : "";
+      writeStreak(n, date);
+      delete state.streakCounted;
+      saveState(state);
     }
-    return streak;
+    // a streak only survives while its last complete day is today or yesterday
+    return (date === today || date === yesterday) ? n : 0;
+  }
+  function currentStreak() {
+    const { n, date } = readStreak();
+    return (date === todayKey() || date === dateKeyDaysAgo(1)) ? n : 0;
+  }
+
+  // Older versions scored every day against all activities (other weekdays and side quests
+  // included), so totals came out inflated. Re-score those entries once.
+  function repairLegacyHistory() {
+    const history = loadHistory();
+    let changed = false;
+    history.forEach(h => {
+      if (h.v === 2) return;
+      h.v = 2;
+      changed = true;
+      if (!Array.isArray(h.doneIds)) return;
+      const doneMap = {};
+      h.doneIds.forEach(id => { doneMap[id] = true; });
+      const fixed = scoreDay(h.date, doneMap);
+      if (fixed.total > 0 && fixed.total < h.total) {
+        h.total = fixed.total;
+        h.done = fixed.done;
+      }
+    });
+    if (changed) saveHistory(history);
   }
 
   let quests = loadQuests();
-  let totalCount = quests.reduce((n, b) => n + b.items.filter(i => i.type !== "protegida").length, 0);
-  let state = loadState(totalCount);
+  let state = loadState();
+  repairLegacyHistory();
+  if (!rolloverIfNeeded()) pruneExpiredOneOffs();
   let editMode = false;
   let todayTotal = 0, todayDoneCount = 0; // updated at the end of every render(), reflects today's day-filtered, non-bonus count
-
-  const dayNames = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
-  document.getElementById("dayName").textContent = dayNames[new Date().getDay()];
-  document.getElementById("dateNote").textContent = "se reinicia automáticamente cada día";
+  let lastStreakShown = null;
+  let justToggledId = null;
 
   const blocksEl = document.getElementById("blocks");
   const modalBackdrop = document.getElementById("modalBackdrop");
@@ -1150,11 +1494,22 @@
   const fieldTime = document.getElementById("fieldTime");
   const modalTitle = document.getElementById("modalTitle");
   const modalDeleteRow = document.getElementById("modalDeleteRow");
+  const dayNoteField = document.getElementById("dayNoteField");
+
+  function refreshDayUI() {
+    const d = logicalNow();
+    document.getElementById("dayName").textContent = DAY_NAMES[d.getDay()];
+    document.getElementById("kicker").textContent = `BITÁCORA · ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+    document.getElementById("dateNote").textContent = dayStartOffsetMinutes()
+      ? "se reinicia automáticamente cada día a las 5:00 am"
+      : "se reinicia automáticamente cada día";
+    dayNoteField.value = loadNotes()[state.date] || "";
+  }
 
   let modalCtx = null; // { blockIdx, itemIdx } or { blockIdx, isNew: true }
 
   function checkIcon() {
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>';
   }
 
   function parseTimeToMinutes(str) {
@@ -1173,22 +1528,88 @@
     return `${h}:${mStr} ${ap}`;
   }
 
-  function sortBlockByTime(block) {
-    block.items.sort((a, b) => {
-      const ta = parseTimeToMinutes(a.time);
-      const tb = parseTimeToMinutes(b.time);
-      if (ta === null && tb === null) return 0;
-      if (ta === null) return 1;
-      if (tb === null) return -1;
-      return ta - tb;
-    });
+  // untimed items go last; sort is stable, so their manual order is kept
+  function compareTimes(a, b) {
+    const ta = parseTimeToMinutes(a);
+    const tb = parseTimeToMinutes(b);
+    if (ta === null && tb === null) return 0;
+    if (ta === null) return 1;
+    if (tb === null) return -1;
+    return ta - tb;
   }
+  function sortBlockByTime(block) {
+    block.items.sort((a, b) => compareTimes(a.time, b.time));
+  }
+
+  // ---- toast with undo ----
+  const toastEl = document.getElementById("toast");
+  const toastText = document.getElementById("toastText");
+  const toastUndo = document.getElementById("toastUndo");
+  let toastTimer = null, toastUndoFn = null;
+  function showToast(text, undoFn) {
+    toastText.textContent = text;
+    toastUndoFn = undoFn || null;
+    toastUndo.style.display = undoFn ? "" : "none";
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, undoFn ? 6000 : 3000);
+  }
+  function hideToast() {
+    toastEl.classList.remove("show");
+    toastUndoFn = null;
+  }
+  toastUndo.addEventListener("click", () => {
+    const fn = toastUndoFn;
+    hideToast();
+    if (fn) fn();
+  });
+  function takeSnapshot() { return JSON.stringify({ quests, state }); }
+  function undoTo(snap) {
+    return () => {
+      const data = JSON.parse(snap);
+      quests = data.quests;
+      if (data.state.date === todayKey()) state = data.state;
+      saveQuests(quests);
+      saveState(state);
+      render();
+    };
+  }
+
+  // ---- modals ----
+  function openBackdrop(el) {
+    el.classList.add("show");
+    document.body.classList.add("modal-open");
+  }
+  function closeBackdrop(el) {
+    if (el === modalBackdrop) { closeModal(); return; }
+    el.classList.remove("show");
+    syncScrollLock();
+  }
+  function syncScrollLock() {
+    document.body.classList.toggle("modal-open", !!document.querySelector(".modal-backdrop.show"));
+  }
+  document.querySelectorAll(".modal-backdrop").forEach(el => {
+    el.addEventListener("click", (e) => {
+      if (e.target === el || e.target.closest("[data-close]")) closeBackdrop(el);
+    });
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const open = Array.from(document.querySelectorAll(".modal-backdrop.show"));
+    if (open.length) closeBackdrop(open[open.length - 1]);
+  });
 
   const fieldNote = document.getElementById("fieldNote");
   const typeSelect = document.getElementById("typeSelect");
   const prioritySelect = document.getElementById("prioritySelect");
   const daySelect = document.getElementById("daySelect");
   const fieldBonus = document.getElementById("fieldBonus");
+  const typeHint = document.getElementById("typeHint");
+  const TYPE_HINTS = {
+    normal: "Se repite los días que elijas y cuenta para tu progreso.",
+    protegida: "Tiempo reservado para ti: se muestra, pero no se marca ni cuenta.",
+    imprevisto: "Solo para hoy: desaparece mañana (queda en tu historial si la haces).",
+  };
   const PRESET_ACTIVITIES = [
     "Leer", "Meditar", "Estudiar", "Estirar", "Caminar", "Beber agua",
     "Tomar el sol", "Escribir / journaling", "Llamar a un familiar o amigo",
@@ -1215,10 +1636,19 @@
   let selectedDays = ALL_DAYS.slice();
   let editingItemId = null; // id of the item currently open in the modal, if editing
 
+  function syncTypeFields() {
+    typeSelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b.dataset.type === selectedType));
+    typeHint.textContent = TYPE_HINTS[selectedType] || "";
+    const isProtected = selectedType === "protegida";
+    document.getElementById("daysField").style.display = selectedType === "imprevisto" ? "none" : "";
+    document.getElementById("priorityField").style.display = isProtected ? "none" : "";
+    document.getElementById("bonusField").style.display = isProtected ? "none" : "";
+    checkTimeOverlap();
+  }
   typeSelect.querySelectorAll(".type-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       selectedType = btn.dataset.type;
-      typeSelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b === btn));
+      syncTypeFields();
     });
   });
   prioritySelect.querySelectorAll(".type-btn").forEach(btn => {
@@ -1243,30 +1673,30 @@
 
   function checkTimeOverlap() {
     const time = fieldTime.value;
-    if (!time) { timeWarning.classList.remove("show"); return; }
     const mins = parseTimeToMinutes(time);
     if (mins === null) { timeWarning.classList.remove("show"); return; }
     const targetIdx = blockIdxForMinutes(mins);
-    const clash = quests[targetIdx].items.some(i => {
+    const myDays = selectedType === "imprevisto" ? [todayDow()] : selectedDays;
+    const clash = quests[targetIdx].items.find(i => {
       if (i.time !== time || i.id === editingItemId) return false;
-      const otherDays = (i.days && i.days.length) ? i.days : ALL_DAYS;
-      return selectedDays.some(d => otherDays.includes(d));
+      const otherDays = i.date ? [dateFromKey(i.date).getDay()] : daysOf(i);
+      return myDays.some(d => otherDays.includes(d));
     });
-    timeWarning.textContent = clash ? "⚠ Ya tienes otra actividad a esta hora, en un día en común, en ese bloque." : "";
-    timeWarning.classList.toggle("show", clash);
+    timeWarning.textContent = clash ? `⚠ A esta hora ya tienes "${clash.t}" en un día en común.` : "";
+    timeWarning.classList.toggle("show", !!clash);
   }
   fieldTime.addEventListener("input", checkTimeOverlap);
 
   function openModal(ctx) {
     modalCtx = ctx;
     if (ctx.isNew) {
-      modalTitle.textContent = "Nueva actividad";
+      modalTitle.textContent = ctx.presetType === "imprevisto" ? "Surgió algo" : "Nueva actividad";
       fieldTitle.value = "";
       fieldTime.value = ctx.presetTime || "";
       fieldNote.value = "";
       selectedType = ctx.presetType || "normal";
       selectedPriority = "opcional";
-      selectedDays = ctx.presetDays ? ctx.presetDays.slice() : ALL_DAYS.slice();
+      selectedDays = ALL_DAYS.slice();
       fieldBonus.checked = false;
       editingItemId = null;
       modalDeleteRow.style.display = "none";
@@ -1278,114 +1708,146 @@
       fieldNote.value = item.note || "";
       selectedType = item.type || "normal";
       selectedPriority = item.priority || "opcional";
-      selectedDays = (item.days && item.days.length) ? item.days.slice() : ALL_DAYS.slice();
+      selectedDays = daysOf(item).slice();
       fieldBonus.checked = !!item.bonus;
       editingItemId = item.id;
       modalDeleteRow.style.display = "flex";
     }
-    typeSelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b.dataset.type === selectedType));
     prioritySelect.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b.dataset.priority === selectedPriority));
     daySelect.querySelectorAll(".day-btn").forEach(b => b.classList.toggle("active", selectedDays.includes(parseInt(b.dataset.day, 10))));
     presetSelect.value = "";
-    resetDeleteBtn();
-    checkTimeOverlap();
-    modalBackdrop.classList.add("show");
+    syncTypeFields();
+    openBackdrop(modalBackdrop);
     setTimeout(() => fieldTitle.focus(), 50);
   }
   function closeModal() {
     modalBackdrop.classList.remove("show");
     modalCtx = null;
-    resetDeleteBtn();
+    syncScrollLock();
   }
   document.getElementById("modalCancel").addEventListener("click", closeModal);
-  modalBackdrop.addEventListener("click", (e) => { if (e.target === modalBackdrop) closeModal(); });
 
-  document.getElementById("modalSave").addEventListener("click", () => {
+  function saveModal() {
+    if (!modalCtx) return;
     const title = fieldTitle.value.trim();
     if (!title) { fieldTitle.focus(); return; }
     const time = fieldTime.value; // already HH:MM (24h) from the native picker, or ""
     const note = fieldNote.value.trim();
+    const isOneOff = selectedType === "imprevisto";
 
     let targetBlockIdx = modalCtx.blockIdx;
     const mins = parseTimeToMinutes(time);
     if (mins !== null) targetBlockIdx = blockIdxForMinutes(mins);
 
+    let item;
     if (modalCtx.isNew) {
-      const id = makeId();
-      quests[targetBlockIdx].items.push({ id, t: title, time, note, type: selectedType, priority: selectedPriority, days: selectedDays.slice(), bonus: fieldBonus.checked });
+      item = { id: makeId() };
+      quests[targetBlockIdx].items.push(item);
     } else {
-      const item = quests[modalCtx.blockIdx].items[modalCtx.itemIdx];
-      item.t = title;
-      item.time = time;
-      item.note = note;
-      item.type = selectedType;
-      item.priority = selectedPriority;
-      item.days = selectedDays.slice();
-      item.bonus = fieldBonus.checked;
+      item = quests[modalCtx.blockIdx].items[modalCtx.itemIdx];
+      if (item.time !== time) delete state.moved[item.id];
       if (targetBlockIdx !== modalCtx.blockIdx) {
         quests[modalCtx.blockIdx].items.splice(modalCtx.itemIdx, 1);
         quests[targetBlockIdx].items.push(item);
       }
     }
+    item.t = title;
+    item.time = time;
+    item.note = note;
+    item.type = selectedType;
+    item.priority = selectedPriority;
+    item.bonus = fieldBonus.checked && selectedType !== "protegida";
+    if (isOneOff) {
+      item.date = item.date || todayKey();
+      item.days = [dateFromKey(item.date).getDay()];
+    } else {
+      delete item.date;
+      item.days = selectedDays.slice().sort((a, b) => a - b);
+    }
+    if (selectedType === "protegida") delete state.done[item.id];
     sortBlockByTime(quests[targetBlockIdx]);
     saveQuests(quests);
-    totalCount = quests.reduce((n, b) => n + b.items.filter(i => i.type !== "protegida").length, 0);
+    saveState(state);
     closeModal();
     render();
-  });
-
-  const deleteBtn = document.getElementById("modalDelete");
-  let deleteArmed = false;
-  function resetDeleteBtn() {
-    deleteArmed = false;
-    deleteBtn.textContent = "Eliminar actividad";
   }
-  deleteBtn.addEventListener("click", () => {
-    if (!deleteArmed) {
-      deleteArmed = true;
-      deleteBtn.textContent = "¿Seguro? Toca de nuevo";
-      setTimeout(() => { if (deleteArmed) resetDeleteBtn(); }, 4000);
-      return;
-    }
+  document.getElementById("modalSave").addEventListener("click", saveModal);
+  [fieldTitle, fieldNote].forEach(el => el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); saveModal(); }
+  }));
+
+  document.getElementById("modalDelete").addEventListener("click", () => {
+    if (!modalCtx || modalCtx.isNew) return;
+    const snap = takeSnapshot();
     const item = quests[modalCtx.blockIdx].items[modalCtx.itemIdx];
     quests[modalCtx.blockIdx].items.splice(modalCtx.itemIdx, 1);
     delete state.done[item.id];
+    delete state.moved[item.id];
     saveQuests(quests);
     saveState(state);
-    totalCount = quests.reduce((n, b) => n + b.items.filter(i => i.type !== "protegida").length, 0);
-    resetDeleteBtn();
     closeModal();
     render();
+    showToast(`Eliminaste "${item.t}"`, undoTo(snap));
   });
 
-  function postponeItem(bIdx, iIdx) {
-    const block = quests[bIdx];
-    const item = block.items[iIdx];
-    if (item.time) {
-      const mins = Math.min(parseTimeToMinutes(item.time) + 60, 23 * 60 + 59);
-      item.time = minutesTo24(mins);
-      const targetIdx = blockIdxForMinutes(mins);
-      if (targetIdx !== bIdx) {
-        block.items.splice(iIdx, 1);
-        quests[targetIdx].items.push(item);
-        sortBlockByTime(quests[targetIdx]);
-      } else {
-        sortBlockByTime(block);
-      }
+  // Postponing only affects today: the override lives in state.moved and is dropped tomorrow.
+  function postponeItem(item, srcBlockIdx) {
+    const cur = state.moved[item.id];
+    const time = cur ? cur.time : item.time;
+    const block = cur ? cur.block : srcBlockIdx;
+    const snap = takeSnapshot();
+    let label;
+    if (time) {
+      const mins = parseTimeToMinutes(time);
+      const next = Math.min(mins + 60, 23 * 60 + 59);
+      if (next === mins) { showToast("No se puede posponer más por hoy"); return; }
+      state.moved[item.id] = { time: minutesTo24(next), block: blockIdxForMinutes(next) };
+      label = `a las ${formatTimeDisplay(minutesTo24(next))}`;
     } else {
-      const nextIdx = (bIdx + 1) % quests.length;
-      block.items.splice(iIdx, 1);
-      quests[nextIdx].items.push(item);
+      if (block >= quests.length - 1) { showToast("No se puede posponer más por hoy"); return; }
+      state.moved[item.id] = { time: "", block: block + 1 };
+      label = `a ${quests[block + 1].block.toLowerCase()}`;
     }
-    saveQuests(quests);
+    saveState(state);
     render();
+    showToast(`Pospuesta ${label} (solo hoy)`, undoTo(snap));
+  }
+
+  function toggleItem(item) {
+    if (checkDay()) return; // the day changed under us: show the fresh day instead of marking it
+    const willBeDone = !state.done[item.id];
+    if (willBeDone) state.done[item.id] = true; else delete state.done[item.id];
+    saveState(state);
+    if (willBeDone) { beep(880, 70, 0.035); hapticTick(); justToggledId = item.id; }
+    render();
+    justToggledId = null;
+  }
+
+  // today's view of the schedule: items are placed by their (possibly postponed) time
+  function buildView() {
+    const view = quests.map(() => []);
+    quests.forEach((block, bIdx) => block.items.forEach((item, iIdx) => {
+      const mv = !editMode && state.moved[item.id];
+      const target = mv && view[mv.block] ? mv.block : bIdx;
+      view[target].push({ item, bIdx, iIdx, time: mv ? mv.time : item.time, moved: !!mv });
+    }));
+    if (!editMode) view.forEach(list => list.sort((a, b) => compareTimes(a.time, b.time)));
+    return view;
+  }
+
+  function untimedNeighbor(block, from, dir) {
+    for (let j = from + dir; j >= 0 && j < block.items.length; j += dir) {
+      if (!block.items[j].time) return j;
+    }
+    return -1;
   }
 
   function render() {
     blocksEl.innerHTML = "";
-    let total = 0, done = 0, critTotal = 0, critDone = 0, bonusTotal = 0, bonusDone = 0;
+    let total = 0, done = 0, critTotal = 0, critDone = 0, bonusTotal = 0, bonusDone = 0, visibleTotal = 0;
     const curBlock = currentBlockIdx();
-    const todayDow = new Date().getDay();
+    const dow = todayDow(), key = todayKey();
+    const view = buildView();
 
     quests.forEach((block, bIdx) => {
       const blockEl = document.createElement("div");
@@ -1393,79 +1855,101 @@
       blockEl.className = "block" + (isCur ? " current-block" : "") + (!editMode && !isCur ? " not-current" : "");
       blockEl.dataset.blockIdx = bIdx;
 
+      const entries = view[bIdx].filter(e => editMode || isScheduledOn(e.item, dow, key));
+      visibleTotal += entries.length;
+      const countable = entries.filter(e => countsTowardTotal(e.item));
+      const countableDone = countable.filter(e => state.done[e.item.id]).length;
+
       const head = document.createElement("div");
       head.className = "block-head";
-      head.innerHTML = `<span class="glyph">${block.glyph}</span><h2>${block.block}</h2><span class="span">${BLOCK_RANGES[bIdx].label}</span>`;
+      const range = BLOCK_RANGES[bIdx] ? BLOCK_RANGES[bIdx].label : "";
+      const countHtml = !editMode && countable.length
+        ? `<span class="count${countableDone === countable.length ? " full" : ""}">${countableDone}/${countable.length}</span>` : "";
+      head.innerHTML = `<span class="glyph" aria-hidden="true">${escapeHtml(block.glyph)}</span><h2>${escapeHtml(block.block)}</h2><span class="span">${range}</span>${countHtml}`;
       blockEl.appendChild(head);
 
-      let visibleCount = 0;
-      block.items.forEach((item, iIdx) => {
-        const days = (item.days && item.days.length) ? item.days : ALL_DAYS;
-        const scheduledToday = days.length >= 7 || days.includes(todayDow);
-        if (!editMode && !scheduledToday) return; // hidden today, only visible while editing
-
-        visibleCount++;
+      entries.forEach(entry => {
+        const item = entry.item;
+        const srcBlock = quests[entry.bIdx];
+        const iIdx = entry.iIdx;
+        const days = daysOf(item);
         const isProtected = item.type === "protegida";
         const isBonus = !!item.bonus && !isProtected;
         const isCritical = item.priority === "critica" && !isProtected && !isBonus;
-        if (!isProtected && !isBonus) total++;
-        if (isBonus) bonusTotal++;
-        if (isCritical) critTotal++;
-        const isDone = !!state.done[item.id];
-        if (!isProtected && !isBonus && isDone) done++;
-        if (isBonus && isDone) bonusDone++;
-        if (isCritical && isDone) critDone++;
+        const isDone = !isProtected && !!state.done[item.id];
+        // edit mode lists every weekday's items; only today's count toward progress
+        if (!editMode || isScheduledOn(item, dow, key)) {
+          if (!isProtected && !isBonus) total++;
+          if (isBonus) bonusTotal++;
+          if (isCritical) critTotal++;
+          if (!isProtected && !isBonus && isDone) done++;
+          if (isBonus && isDone) bonusDone++;
+          if (isCritical && isDone) critDone++;
+        }
 
-        const timeLabel = formatTimeDisplay(item.time);
-        const daysBadge = days.length < 7 ? days.slice().sort().map(d => DAY_LETTERS[d]).join("") : "";
-        const timeLine = [timeLabel, item.note, daysBadge].filter(Boolean).join(" · ");
+        const timeLabel = formatTimeDisplay(entry.time);
+        let daysBadge = "";
+        if (item.date) daysBadge = editMode ? "solo hoy" : "";
+        else if (days.length < 7) daysBadge = days.slice().sort(mondayFirst).map(d => DAY_LETTERS[d]).join("");
+        const timeLine = [
+          timeLabel,
+          escapeHtml(item.note),
+          daysBadge,
+          entry.moved ? `<span class="moved">⏭ pospuesta</span>` : "",
+        ].filter(Boolean).join(" · ");
 
         const card = document.createElement("div");
         card.className = "card"
-          + (isDone && !isProtected ? " done" : "")
+          + (isDone ? " done" : "")
+          + (item.id === justToggledId ? " just-done" : "")
           + (editMode ? " editmode" : "")
-          + (item.type === "protegida" ? " type-protegida" : "")
+          + (isProtected ? " type-protegida" : "")
           + (item.type === "imprevisto" ? " type-imprevisto" : "")
           + (isCritical ? " priority-critica" : "")
           + (isBonus ? " type-bonus" : "");
+        if (!editMode && !isProtected) {
+          card.setAttribute("role", "checkbox");
+          card.setAttribute("aria-checked", isDone ? "true" : "false");
+          card.tabIndex = 0;
+        }
         const canReorder = !item.time;
-        const isFirst = iIdx === 0;
-        const isLast = iIdx === block.items.length - 1;
-        const showPostpone = !editMode && !isProtected && !isDone;
+        const prevIdx = canReorder ? untimedNeighbor(srcBlock, iIdx, -1) : -1;
+        const nextIdx = canReorder ? untimedNeighbor(srcBlock, iIdx, 1) : -1;
+        const canPostpone = entry.time
+          ? parseTimeToMinutes(entry.time) < 23 * 60 + 59
+          : bIdx < quests.length - 1;
+        const showPostpone = !editMode && !isProtected && !isDone && canPostpone;
         card.innerHTML = `
-          <div class="box">${isProtected ? "" : checkIcon()}</div>
+          <div class="box" aria-hidden="true">${isProtected ? "" : checkIcon()}</div>
           <div class="card-body">
-            <div class="card-title">${item.t}</div>
+            <div class="card-title">${escapeHtml(item.t)}</div>
             ${timeLine ? `<div class="card-time">${timeLine}</div>` : ""}
           </div>
-          ${showPostpone ? `<div class="quick-actions"><button class="postpone-btn" aria-label="Posponer" title="Posponer">⏭</button></div>` : ""}
+          ${showPostpone ? `<div class="quick-actions"><button class="postpone-btn" aria-label="Posponer ${escapeHtml(item.t)}" title="Posponer (solo hoy)">⏭</button></div>` : ""}
           <div class="card-actions">
-            ${canReorder ? `<button class="icon-btn move-up" aria-label="Subir" ${isFirst ? "disabled" : ""}>▲</button>
-            <button class="icon-btn move-down" aria-label="Bajar" ${isLast ? "disabled" : ""}>▼</button>` : ""}
-            <button class="icon-btn edit-item" aria-label="Editar">✎</button>
+            ${canReorder ? `<button class="icon-btn move-up" aria-label="Subir" ${prevIdx < 0 ? "disabled" : ""}>▲</button>
+            <button class="icon-btn move-down" aria-label="Bajar" ${nextIdx < 0 ? "disabled" : ""}>▼</button>` : ""}
+            <button class="icon-btn edit-item" aria-label="Editar ${escapeHtml(item.t)}">✎</button>
           </div>
         `;
         card.addEventListener("click", (e) => {
           if (editMode) {
-            if (e.target.closest(".edit-item")) { openModal({ blockIdx: bIdx, itemIdx: iIdx }); return; }
-            if (e.target.closest(".move-up") && !isFirst) {
-              [block.items[iIdx - 1], block.items[iIdx]] = [block.items[iIdx], block.items[iIdx - 1]];
-              saveQuests(quests); render(); return;
-            }
-            if (e.target.closest(".move-down") && !isLast) {
-              [block.items[iIdx + 1], block.items[iIdx]] = [block.items[iIdx], block.items[iIdx + 1]];
-              saveQuests(quests); render(); return;
+            if (e.target.closest(".edit-item")) { openModal({ blockIdx: entry.bIdx, itemIdx: iIdx }); return; }
+            const swapWith = e.target.closest(".move-up") ? prevIdx : e.target.closest(".move-down") ? nextIdx : -1;
+            if (swapWith >= 0) {
+              [srcBlock.items[swapWith], srcBlock.items[iIdx]] = [srcBlock.items[iIdx], srcBlock.items[swapWith]];
+              saveQuests(quests); render();
             }
             return;
           }
-          if (e.target.closest(".postpone-btn")) { postponeItem(bIdx, iIdx); return; }
+          if (e.target.closest(".postpone-btn")) { postponeItem(item, entry.bIdx); return; }
           if (isProtected) return; // not toggleable
-          const willBeDone = !state.done[item.id];
-          state.done[item.id] = willBeDone;
-          state.date = todayKey();
-          saveState(state);
-          if (willBeDone) { beep(880, 70, 0.035); hapticTick(); }
-          render();
+          toggleItem(item);
+        });
+        card.addEventListener("keydown", (e) => {
+          if (e.target !== card || (e.key !== "Enter" && e.key !== " ")) return;
+          e.preventDefault();
+          card.click();
         });
         blockEl.appendChild(card);
       });
@@ -1479,23 +1963,34 @@
       blocksEl.appendChild(blockEl);
     });
 
-    document.getElementById("progressLabel").textContent = `${done}/${total}`;
-    document.getElementById("barFill").style.width = total ? `${(done / total) * 100}%` : "0%";
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    document.getElementById("progressLabel").textContent = total ? `${done}/${total} · ${pct}%` : "0/0";
+    document.getElementById("barFill").style.width = `${pct}%`;
+    document.getElementById("bar").setAttribute("aria-valuenow", String(pct));
     document.getElementById("criticalLabel").textContent = `${critDone}/${critTotal}`;
     const bonusRow = document.getElementById("bonusRow");
     bonusRow.style.display = bonusTotal > 0 ? "block" : "none";
     document.getElementById("bonusLabel").textContent = `${bonusDone}/${bonusTotal}`;
+    document.getElementById("editBanner").classList.toggle("show", editMode);
+    document.getElementById("emptyHint").classList.toggle("show", !editMode && visibleTotal === 0);
 
     todayTotal = total;
     todayDoneCount = done;
 
     const allDone = total > 0 && done === total;
     const streak = updateStreak(allDone);
-    document.getElementById("streakN").textContent = (streak > 0 ? "🔥 " : "") + streak;
-    maybeShowCompletion(allDone);
+    const streakEl = document.getElementById("streakN");
+    streakEl.textContent = (streak > 0 ? "🔥 " : "") + streak;
+    if (lastStreakShown !== null && streak > lastStreakShown) {
+      streakEl.classList.remove("pop");
+      void streakEl.offsetWidth;
+      streakEl.classList.add("pop");
+    }
+    lastStreakShown = streak;
+    maybeShowCompletion(allDone, streak);
 
-    renderHistory(done, total);
-    renderCalendar(done, total);
+    renderHistory();
+    renderCalendar();
     renderHeatmap();
   }
 
@@ -1507,59 +2002,91 @@
       el.classList.toggle("not-current", !editMode && idx !== curBlock);
     });
   }
-  setInterval(updateFocusClasses, 60000);
 
-  function renderHistory(todayDone, todayTotal) {
-    const history = loadHistory();
+  // Midnight (or 5 am) rollover while the app stays open or sits in the background.
+  function checkDay() {
+    if (state.date === todayKey()) return false;
+    if (modalBackdrop.classList.contains("show")) return false; // don't shuffle items under an open editor
+    flushDayNote();
+    rolloverIfNeeded();
+    refreshDayUI();
+    render();
+    return true;
+  }
+  setInterval(() => { if (!checkDay()) updateFocusClasses(); }, 60000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") { if (!checkDay()) updateFocusClasses(); }
+    else flushDayNote();
+  });
+  window.addEventListener("pagehide", flushDayNote);
+
+  // history + today, keyed by date
+  function dayMap() {
+    const map = {};
+    loadHistory().forEach(h => { map[h.date] = h; });
+    map[todayKey()] = { date: todayKey(), done: todayDoneCount, total: todayTotal, doneTitles: todayDoneTitles() };
+    return map;
+  }
+  function todayDoneTitles() {
+    return Object.keys(state.done).filter(id => state.done[id]).map(id => {
+      const item = findItemById(id);
+      return item ? item.t : null;
+    }).filter(Boolean);
+  }
+  function cellClass(base, entry, key, notes) {
+    let cls = base;
+    if (key === todayKey()) cls += " today";
+    if (entry && entry.total > 0) {
+      if (entry.done >= entry.total) cls += " complete";
+      else if (entry.done > 0) cls += " partial";
+    }
+    if (notes[key]) cls += " has-note";
+    return cls;
+  }
+  function cellLabel(key, entry, notes) {
+    let label = formatLongDate(key);
+    if (entry && entry.total) label += `: ${entry.done}/${entry.total}`;
+    if (notes[key]) label += ` — "${notes[key]}"`;
+    return label;
+  }
+
+  function renderHistory() {
+    const map = dayMap();
     const notes = loadNotes();
     const row = document.getElementById("historyRow");
     row.innerHTML = "";
-    const days = [];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = localDateKey(d);
-      days.push(key);
-    }
-    const dayLetters = ["D","L","M","M","J","V","S"];
-    days.forEach(key => {
-      const isToday = key === todayKey();
-      const entry = isToday ? { done: todayDone, total: todayTotal } : history.find(h => h.date === key);
-      const cell = document.createElement("div");
-      let cls = "history-cell";
-      if (isToday) cls += " today";
-      if (entry && entry.total > 0) {
-        if (entry.done === entry.total) cls += " complete";
-        else if (entry.done > 0) cls += " partial";
-      }
-      if (notes[key]) cls += " has-note";
-      cell.className = cls;
-      const d = new Date(key + "T00:00:00");
-      cell.textContent = dayLetters[d.getDay()];
-      let title = entry ? `${key}: ${entry.done}/${entry.total}` : key;
-      if (notes[key]) title += ` — "${notes[key]}"`;
-      cell.title = title;
+      const key = dateKeyDaysAgo(i);
+      const entry = map[key];
+      const cell = document.createElement("button");
+      cell.className = cellClass("history-cell", entry, key, notes);
+      cell.textContent = DAY_LETTERS[dateFromKey(key).getDay()];
+      cell.title = cellLabel(key, entry, notes);
+      cell.setAttribute("aria-label", cell.title);
+      cell.addEventListener("click", () => openDayDetail(key));
       row.appendChild(cell);
-    });
+    }
   }
 
   let calOpen = false;
-  let calCursor = new Date(); // month currently shown
+  let calCursor = logicalNow(); // month currently shown
+  calCursor.setDate(1);
 
-  function renderCalendar(todayDone, todayTotal) {
+  function renderCalendar() {
     if (!calOpen) return;
-    const history = loadHistory();
+    const map = dayMap();
     const notes = loadNotes();
-    const map = {};
-    history.forEach(h => { map[h.date] = h; });
-    map[todayKey()] = { done: todayDone, total: todayTotal };
+    const today = todayKey();
 
-    const monthNames = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-    document.getElementById("calLabel").textContent = `${monthNames[calCursor.getMonth()]} ${calCursor.getFullYear()}`;
+    document.getElementById("calLabel").textContent = `${MONTH_NAMES[calCursor.getMonth()]} ${calCursor.getFullYear()}`;
+    const now = logicalNow();
+    document.getElementById("calNext").disabled =
+      calCursor.getFullYear() > now.getFullYear() ||
+      (calCursor.getFullYear() === now.getFullYear() && calCursor.getMonth() >= now.getMonth());
 
     const grid = document.getElementById("calGrid");
     grid.innerHTML = "";
-    ["D","L","M","M","J","V","S"].forEach(l => {
+    ["L", "M", "M", "J", "V", "S", "D"].forEach(l => {
       const dow = document.createElement("div");
       dow.className = "cal-dow";
       dow.textContent = l;
@@ -1567,31 +2094,25 @@
     });
 
     const year = calCursor.getFullYear(), month = calCursor.getMonth();
-    const firstDow = new Date(year, month, 1).getDay();
+    const lead = (new Date(year, month, 1).getDay() + 6) % 7; // weeks start on Monday
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-    for (let i = 0; i < firstDow; i++) {
+    for (let i = 0; i < lead; i++) {
       const empty = document.createElement("div");
       empty.className = "cal-cell empty";
       grid.appendChild(empty);
     }
     for (let d = 1; d <= daysInMonth; d++) {
-      const dateObj = new Date(year, month, d);
-      const key = localDateKey(dateObj);
+      const key = localDateKey(new Date(year, month, d));
       const entry = map[key];
-      const cell = document.createElement("div");
-      let cls = "cal-cell";
-      if (key === todayKey()) cls += " today";
-      if (entry && entry.total > 0) {
-        if (entry.done === entry.total) cls += " complete";
-        else if (entry.done > 0) cls += " partial";
-      }
-      if (notes[key]) cls += " has-note";
-      cell.className = cls;
+      const cell = document.createElement("button");
+      const isFuture = key > today;
+      cell.className = cellClass("cal-cell", entry, key, notes) + (isFuture ? " future" : "");
       cell.textContent = d;
-      let title = entry ? `${key}: ${entry.done}/${entry.total}` : key;
-      if (notes[key]) title += ` — "${notes[key]}"`;
-      cell.title = title;
+      cell.title = cellLabel(key, entry, notes);
+      cell.setAttribute("aria-label", cell.title);
+      if (isFuture) cell.disabled = true;
+      else cell.addEventListener("click", () => openDayDetail(key));
       grid.appendChild(cell);
     }
   }
@@ -1599,44 +2120,38 @@
   document.getElementById("calToggle").addEventListener("click", (e) => {
     calOpen = !calOpen;
     e.currentTarget.classList.toggle("active", calOpen);
+    e.currentTarget.setAttribute("aria-expanded", String(calOpen));
     document.getElementById("calendar").classList.toggle("show", calOpen);
-    if (calOpen) renderCalendar(todayDoneCount, todayTotal);
+    if (calOpen) renderCalendar();
   });
   document.getElementById("calPrev").addEventListener("click", () => {
     calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() - 1, 1);
-    renderCalendar(todayDoneCount, todayTotal);
+    renderCalendar();
   });
   document.getElementById("calNext").addEventListener("click", () => {
     calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() + 1, 1);
-    renderCalendar(todayDoneCount, todayTotal);
+    renderCalendar();
   });
 
   let heatOpen = false;
   function renderHeatmap() {
     if (!heatOpen) return;
-    const history = loadHistory();
-    const map = {};
-    history.forEach(h => { map[h.date] = h; });
-    map[todayKey()] = { done: todayDoneCount, total: todayTotal };
+    const map = dayMap();
+    const notes = loadNotes();
 
     const grid = document.getElementById("heatGrid");
     grid.innerHTML = "";
-    const days = [];
-    for (let i = 364; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      days.push(d);
-    }
-    // pad the front so the grid starts on a Sunday (row 0)
-    const lead = days[0].getDay();
+    const keys = [];
+    for (let i = 364; i >= 0; i--) keys.push(dateKeyDaysAgo(i));
+    // pad the front so each column starts on a Monday (row 0)
+    const lead = (dateFromKey(keys[0]).getDay() + 6) % 7;
     for (let i = 0; i < lead; i++) {
       const empty = document.createElement("div");
       empty.className = "heat-cell";
       empty.style.visibility = "hidden";
       grid.appendChild(empty);
     }
-    days.forEach(d => {
-      const key = localDateKey(d);
+    keys.forEach(key => {
       const entry = map[key];
       const cell = document.createElement("div");
       let cls = "heat-cell";
@@ -1649,114 +2164,186 @@
       }
       if (key === todayKey()) cls += " today";
       cell.className = cls;
-      cell.title = entry ? `${key}: ${entry.done}/${entry.total}` : key;
+      cell.title = cellLabel(key, entry, notes);
+      cell.addEventListener("click", () => openDayDetail(key));
       grid.appendChild(cell);
     });
   }
   document.getElementById("heatToggle").addEventListener("click", (e) => {
     heatOpen = !heatOpen;
     e.currentTarget.classList.toggle("active", heatOpen);
+    e.currentTarget.setAttribute("aria-expanded", String(heatOpen));
     document.getElementById("heatmap").classList.toggle("show", heatOpen);
-    if (heatOpen) renderHeatmap();
+    if (heatOpen) {
+      renderHeatmap();
+      const scroller = document.getElementById("heatScroll");
+      scroller.scrollLeft = scroller.scrollWidth; // start at today
+    }
   });
 
+  // ---- day detail ----
+  const dayBackdrop = document.getElementById("dayBackdrop");
+  function openDayDetail(key) {
+    const isToday = key === todayKey();
+    const entry = dayMap()[key];
+    const titles = entry ? (entry.doneTitles || []) : [];
+    const note = isToday ? dayNoteField.value.trim() : loadNotes()[key];
+
+    document.getElementById("dayTitle").textContent = formatLongDate(key) + (isToday ? " · hoy" : "");
+    let summary;
+    if (entry && entry.total > 0) {
+      const pct = Math.round((Math.min(entry.done, entry.total) / entry.total) * 100);
+      summary = `${entry.done} de ${entry.total} actividades (${pct}%)` + (entry.done >= entry.total ? " · ¡completo!" : "");
+    } else if (titles.length) {
+      summary = `${titles.length} ${titles.length === 1 ? "actividad hecha" : "actividades hechas"}`;
+    } else {
+      summary = isToday ? "Aún no marcas nada hoy." : "Sin registro para este día.";
+    }
+    document.getElementById("daySummary").textContent = summary;
+
+    const list = document.getElementById("dayList");
+    list.innerHTML = "";
+    titles.forEach(t => {
+      const row = document.createElement("div");
+      const ok = document.createElement("span");
+      ok.className = "ok";
+      ok.textContent = "✓";
+      row.appendChild(ok);
+      row.appendChild(document.createTextNode(t));
+      list.appendChild(row);
+    });
+    const noteEl = document.getElementById("dayNote");
+    noteEl.style.display = note ? "" : "none";
+    noteEl.textContent = note || "";
+    openBackdrop(dayBackdrop);
+  }
+
   document.getElementById("resetBtn").addEventListener("click", () => {
-    state = { date: todayKey(), done: {} };
+    const snap = takeSnapshot();
+    state = Object.assign(freshState(), state.streakCounted ? { streakCounted: true } : {});
     saveState(state);
+    closeBackdrop(menuBackdrop);
     render();
+    showToast("Reiniciaste el día", undoTo(snap));
   });
 
   document.getElementById("copyYesterdayBtn").addEventListener("click", () => {
-    const y = new Date();
-    y.setDate(y.getDate() - 1);
-    const yKey = localDateKey(y);
-    const history = loadHistory();
-    const entry = history.find(h => h.date === yKey);
+    const entry = loadHistory().find(h => h.date === dateKeyDaysAgo(1));
+    closeBackdrop(menuBackdrop);
     if (!entry || !entry.doneIds) {
-      alert("No tengo un registro guardado de ayer para copiar.");
+      showToast("No tengo un registro de ayer para copiar");
       return;
     }
-    const validIds = new Set();
-    quests.forEach(b => b.items.forEach(i => { if (i.type !== "protegida") validIds.add(i.id); }));
-    entry.doneIds.forEach(id => { if (validIds.has(id)) state.done[id] = true; });
-    state.date = todayKey();
+    const snap = takeSnapshot();
+    const dow = todayDow(), key = todayKey();
+    let n = 0;
+    entry.doneIds.forEach(id => {
+      const item = findItemById(id);
+      if (!item || item.type === "protegida" || !isScheduledOn(item, dow, key) || state.done[id]) return;
+      state.done[id] = true;
+      n++;
+    });
+    if (n === 0) { showToast("No hay nada nuevo que copiar de ayer"); return; }
     saveState(state);
     render();
+    showToast(`Marcaste ${n} ${n === 1 ? "actividad" : "actividades"} como ayer`, undoTo(snap));
   });
 
-  document.getElementById("editToggle").addEventListener("click", (e) => {
+  const editToggle = document.getElementById("editToggle");
+  editToggle.addEventListener("click", () => {
     editMode = !editMode;
-    e.currentTarget.classList.toggle("active", editMode);
+    editToggle.classList.toggle("active", editMode);
+    editToggle.setAttribute("aria-pressed", String(editMode));
     render();
   });
 
   // theme toggle (cycles: system -> dark -> light -> system)
   const root = document.documentElement;
+  const themeToggle = document.getElementById("themeToggle");
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  const THEME_LABELS = { system: ["◐", "Tema: automático"], dark: ["☾", "Tema: oscuro"], light: ["☀", "Tema: claro"] };
   let theme = safeGet(THEME_KEY) || "system";
   function applyTheme() {
     if (theme === "system") root.removeAttribute("data-theme");
     else root.setAttribute("data-theme", theme);
+    const [icon, label] = THEME_LABELS[theme] || THEME_LABELS.system;
+    themeToggle.textContent = icon;
+    themeToggle.title = label;
+    themeToggle.setAttribute("aria-label", label);
+    const bg = getComputedStyle(root).getPropertyValue("--bg").trim();
+    if (bg) themeMeta.setAttribute("content", bg);
   }
   applyTheme();
-  document.getElementById("themeToggle").addEventListener("click", () => {
+  themeToggle.addEventListener("click", () => {
     theme = theme === "system" ? "dark" : theme === "dark" ? "light" : "system";
     safeSet(THEME_KEY, theme);
     applyTheme();
   });
+  try {
+    window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => { if (theme === "system") applyTheme(); });
+  } catch (e) {}
 
-  document.getElementById("exportBtn").addEventListener("click", () => {
-    const history = loadHistory();
-    const todayEntry = { date: todayKey(), done: todayDoneCount, total: todayTotal };
-    const map = {};
-    history.forEach(h => { map[h.date] = h; });
-    map[todayEntry.date] = todayEntry;
-    const rows = Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
-
-    const dayNamesFull = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
-    let csv = "fecha,dia,completadas,total,porcentaje\n";
-    rows.forEach(r => {
-      const d = new Date(r.date + "T00:00:00");
-      const pct = r.total ? Math.round((r.done / r.total) * 100) : 0;
-      csv += `${r.date},${dayNamesFull[d.getDay()]},${r.done},${r.total},${pct}%\n`;
-    });
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  function downloadFile(name, content, type) {
+    const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `bitacora-historial-${todayKey()}.csv`;
+    a.download = name;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function csvCell(v) {
+    const s = String(v == null ? "" : v);
+    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+
+  document.getElementById("exportBtn").addEventListener("click", () => {
+    const map = dayMap();
+    const notes = loadNotes();
+    Object.keys(notes).forEach(k => { if (!map[k]) map[k] = { date: k, done: 0, total: 0, doneTitles: [] }; });
+    const rows = Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
+
+    let csv = "fecha,dia,completadas,total,porcentaje,actividades,nota\n";
+    rows.forEach(r => {
+      const d = dateFromKey(r.date);
+      const pct = r.total ? Math.round((Math.min(r.done, r.total) / r.total) * 100) : 0;
+      csv += [r.date, DAY_NAMES[d.getDay()], r.done, r.total, pct + "%", (r.doneTitles || []).join(" | "), notes[r.date] || ""].map(csvCell).join(",") + "\n";
+    });
+    // BOM so spreadsheet apps read the accents correctly
+    downloadFile(`bitacora-historial-${todayKey()}.csv`, "﻿" + csv, "text/csv;charset=utf-8;");
+    closeBackdrop(menuBackdrop);
   });
 
   document.getElementById("fabQuick").addEventListener("click", () => {
     const time = nowHHMM();
     const blockIdx = blockIdxForMinutes(parseTimeToMinutes(time));
-    openModal({ blockIdx, isNew: true, presetType: "imprevisto", presetTime: time, presetDays: [new Date().getDay()] });
+    openModal({ blockIdx, isNew: true, presetType: "imprevisto", presetTime: time });
   });
 
   document.getElementById("backupExportBtn").addEventListener("click", () => {
+    flushDayNote();
+    const streak = readStreak();
     const backup = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       quests,
       state,
       history: loadHistory(),
       notes: loadNotes(),
-      streak: safeGet(STREAK_KEY) || "0",
-      streakDate: safeGet(STREAK_KEY + "-date") || "",
+      streak: String(streak.n),
+      streakDate: streak.date,
+      streakBest: String(bestStreakStored()),
+      settings: {
+        theme,
+        sound: safeGet(SOUND_PREF_KEY) || "on",
+        completePrefs: loadCompletePrefs(),
+        dayStart: safeGet(DAY_START_KEY) || "0",
+      },
     };
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `bitacora-backup-${todayKey()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadFile(`bitacora-backup-${todayKey()}.json`, JSON.stringify(backup, null, 2), "application/json");
+    closeBackdrop(menuBackdrop);
   });
 
   const backupFileInput = document.getElementById("backupFileInput");
@@ -1766,26 +2353,29 @@
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
+      backupFileInput.value = "";
       let data;
-      try { data = JSON.parse(reader.result); } catch (e) {
+      try { data = JSON.parse(reader.result); } catch (e) { data = null; }
+      if (!data || !isValidQuests(data.quests)) {
         alert("Ese archivo no es un backup válido.");
-        backupFileInput.value = "";
-        return;
-      }
-      if (!data || !Array.isArray(data.quests)) {
-        alert("Ese archivo no es un backup válido.");
-        backupFileInput.value = "";
         return;
       }
       const ok = confirm("Esto va a reemplazar tus actividades y tu historial actuales con los del backup. ¿Continuar?");
-      backupFileInput.value = "";
       if (!ok) return;
-      saveQuests(data.quests);
-      if (data.state) saveState(data.state);
-      if (Array.isArray(data.history)) saveHistory(data.history);
-      if (data.notes) safeSet(NOTES_KEY, JSON.stringify(data.notes));
-      if (data.streak) safeSet(STREAK_KEY, data.streak);
-      if (data.streakDate) safeSet(STREAK_KEY + "-date", data.streakDate);
+      saveQuests(migrateQuests(data.quests));
+      if (data.state && typeof data.state.date === "string") saveState(data.state);
+      if (Array.isArray(data.history)) saveHistory(data.history.filter(h => h && typeof h.date === "string"));
+      if (data.notes && typeof data.notes === "object") saveNotes(data.notes);
+      if (data.streak) safeSet(STREAK_KEY, String(data.streak));
+      if (data.streakDate !== undefined) safeSet(STREAK_KEY + "-date", String(data.streakDate || ""));
+      if (data.streakBest) safeSet(STREAK_BEST_KEY, String(data.streakBest));
+      const s = data.settings;
+      if (s) {
+        if (s.theme) safeSet(THEME_KEY, s.theme);
+        if (s.sound) safeSet(SOUND_PREF_KEY, s.sound);
+        if (Array.isArray(s.completePrefs)) saveCompletePrefs(s.completePrefs);
+        if (s.dayStart) safeSet(DAY_START_KEY, s.dayStart);
+      }
       location.reload();
     };
     reader.readAsText(file);
@@ -1793,45 +2383,40 @@
 
   // Menu panel
   const menuBackdrop = document.getElementById("menuBackdrop");
-  document.getElementById("menuToggle").addEventListener("click", () => menuBackdrop.classList.add("show"));
-  document.getElementById("menuClose").addEventListener("click", () => menuBackdrop.classList.remove("show"));
-  menuBackdrop.addEventListener("click", (e) => { if (e.target === menuBackdrop) menuBackdrop.classList.remove("show"); });
+  document.getElementById("menuToggle").addEventListener("click", () => openBackdrop(menuBackdrop));
+  document.getElementById("menuClose").addEventListener("click", () => closeBackdrop(menuBackdrop));
 
   function getKnownTitles() {
-    const set = new Set(PRESET_ACTIVITIES);
+    const set = new Set();
     quests.forEach(b => b.items.forEach(i => { if (i.type !== "protegida") set.add(i.t); }));
     loadHistory().forEach(h => (h.doneTitles || []).forEach(t => set.add(t)));
+    if (set.size === 0) PRESET_ACTIVITIES.forEach(t => set.add(t));
     return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
   }
 
   function getActivityDates(title) {
     const norm = title.trim().toLowerCase();
-    const dates = [];
-    loadHistory().forEach(h => {
-      if ((h.doneTitles || []).some(t => t.trim().toLowerCase() === norm)) dates.push(h.date);
-    });
-    const todayMatches = Object.keys(state.done).some(id => {
-      if (!state.done[id]) return false;
-      const item = findItemById(id);
-      return item && item.t.trim().toLowerCase() === norm;
-    });
-    if (todayMatches && !dates.includes(todayKey())) dates.push(todayKey());
-    return dates.sort();
+    const map = dayMap();
+    return Object.keys(map)
+      .filter(k => (map[k].doneTitles || []).some(t => t.trim().toLowerCase() === norm))
+      .sort();
   }
 
-  const WEEKDAY_NAMES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
   function renderActivityHistory() {
     const title = document.getElementById("activityHistorySelect").value;
     const dates = getActivityDates(title);
-    document.getElementById("activityHistorySummary").textContent =
-      dates.length === 0 ? `Aún no has hecho "${title}".` :
-      `Has hecho "${title}" ${dates.length} ${dates.length === 1 ? "vez" : "veces"}.`;
+    let summary;
+    if (dates.length === 0) summary = `Aún no has hecho "${title}".`;
+    else {
+      const last30 = dates.filter(k => k >= dateKeyDaysAgo(29)).length;
+      summary = `Has hecho "${title}" ${dates.length} ${dates.length === 1 ? "vez" : "veces"} · ${last30} en los últimos 30 días.`;
+    }
+    document.getElementById("activityHistorySummary").textContent = summary;
     const list = document.getElementById("activityHistoryList");
     list.innerHTML = "";
     dates.slice().reverse().forEach(key => {
-      const d = new Date(key + "T00:00:00");
       const row = document.createElement("div");
-      row.textContent = `${key} · ${WEEKDAY_NAMES[d.getDay()]}`;
+      row.textContent = `${key} · ${WEEKDAY_NAMES[dateFromKey(key).getDay()]}`;
       list.appendChild(row);
     });
   }
@@ -1844,17 +2429,96 @@
       select.appendChild(opt);
     });
     renderActivityHistory();
-    menuBackdrop.classList.remove("show");
-    document.getElementById("activityHistoryBackdrop").classList.add("show");
+    closeBackdrop(menuBackdrop);
+    openBackdrop(document.getElementById("activityHistoryBackdrop"));
   });
   document.getElementById("activityHistorySelect").addEventListener("change", renderActivityHistory);
-  document.getElementById("activityHistoryClose").addEventListener("click", () => {
-    document.getElementById("activityHistoryBackdrop").classList.remove("show");
+
+  // ---- stats ----
+  function windowStats(map, n) {
+    let tracked = 0, sum = 0, perfect = 0;
+    for (let i = 0; i < n; i++) {
+      const e = map[dateKeyDaysAgo(i)];
+      if (!e || !e.total || (i === 0 && !e.done)) continue; // an untouched today doesn't drag averages down
+      tracked++;
+      sum += Math.min(1, e.done / e.total);
+      if (e.done >= e.total) perfect++;
+    }
+    return { tracked, perfect, avg: tracked ? Math.round((sum / tracked) * 100) : 0 };
+  }
+  function bestStreakFromHistory(map) {
+    let best = 0, run = 0, prev = null;
+    Object.keys(map).sort().forEach(key => {
+      const e = map[key];
+      const complete = e && e.total > 0 && e.done >= e.total;
+      if (!complete) { run = 0; prev = key; return; }
+      run = prev && nextDateKey(prev) === key && run > 0 ? run + 1 : 1;
+      best = Math.max(best, run);
+      prev = key;
+    });
+    return best;
+  }
+  function renderStats() {
+    const map = dayMap();
+    const w7 = windowStats(map, 7);
+    const w30 = windowStats(map, 30);
+    const streak = currentStreak();
+    const best = Math.max(bestStreakStored(), bestStreakFromHistory(map), streak);
+
+    const byDow = ALL_DAYS.map(() => ({ sum: 0, n: 0 }));
+    for (let i = 0; i < 84; i++) {
+      const key = dateKeyDaysAgo(i);
+      const e = map[key];
+      if (!e || !e.total || (i === 0 && !e.done)) continue;
+      const slot = byDow[dateFromKey(key).getDay()];
+      slot.sum += Math.min(1, e.done / e.total);
+      slot.n++;
+    }
+
+    const counts = {};
+    for (let i = 0; i < 30; i++) {
+      const e = map[dateKeyDaysAgo(i)];
+      (e && e.doneTitles || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; });
+    }
+    const top = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b, "es")).slice(0, 5);
+
+    let html = `<div class="stat-grid">
+      <div class="stat"><div class="stat-n">${streak > 0 ? "🔥 " : ""}${streak}</div><div class="stat-l">racha actual</div></div>
+      <div class="stat"><div class="stat-n">${best}</div><div class="stat-l">mejor racha</div></div>
+      <div class="stat"><div class="stat-n">${w7.tracked ? w7.avg + "%" : "—"}</div><div class="stat-l">promedio 7 días</div></div>
+      <div class="stat"><div class="stat-n">${w30.tracked ? w30.avg + "%" : "—"}</div><div class="stat-l">promedio 30 días</div></div>
+      <div class="stat"><div class="stat-n">${w30.perfect}</div><div class="stat-l">días perfectos (30 d)</div></div>
+      <div class="stat"><div class="stat-n">${Object.keys(map).filter(k => map[k].done > 0 || (map[k].doneTitles || []).length > 0).length}</div><div class="stat-l">días registrados</div></div>
+    </div>`;
+
+    html += `<div class="stat-section">POR DÍA DE LA SEMANA · ÚLTIMAS 12 SEMANAS</div>`;
+    if (byDow.some(s => s.n)) {
+      ALL_DAYS.slice().sort(mondayFirst).forEach(d => {
+        const s = byDow[d];
+        const pct = s.n ? Math.round((s.sum / s.n) * 100) : null;
+        html += `<div class="wbar"><span>${DAY_LETTERS[d]}</span><div class="track"><div class="fill" style="width:${pct || 0}%"></div></div><span class="pct">${pct === null ? "—" : pct + "%"}</span></div>`;
+      });
+    } else {
+      html += `<div class="muted">Todavía no hay suficientes días registrados.</div>`;
+    }
+
+    html += `<div class="stat-section">LO QUE MÁS HACES · 30 DÍAS</div>`;
+    html += top.length
+      ? top.map(t => `<div class="top-row"><span>${escapeHtml(t)}</span><span class="c">×${counts[t]}</span></div>`).join("")
+      : `<div class="muted">Marca actividades para verlas aquí.</div>`;
+
+    document.getElementById("statsBody").innerHTML = html;
+  }
+  document.getElementById("statsBtn").addEventListener("click", () => {
+    renderStats();
+    closeBackdrop(menuBackdrop);
+    openBackdrop(document.getElementById("statsBackdrop"));
   });
 
   document.getElementById("clearActivitiesBtn").addEventListener("click", () => {
     const ok = confirm("Esto borra todas tus actividades excepto Despertar y Dormir. ¿Continuar?");
     if (!ok) return;
+    const snap = takeSnapshot();
     function findWithBlock(id) {
       for (let b = 0; b < quests.length; b++) {
         const it = quests[b].items.find(i => i.id === id);
@@ -1867,22 +2531,23 @@
     quests = quests.map(block => ({ block: block.block, glyph: block.glyph, items: [] }));
     if (wakeFound) quests[wakeFound.blockIdx].items.push(wakeFound.item);
     if (sleepFound) quests[sleepFound.blockIdx].items.push(sleepFound.item);
-    state = { date: todayKey(), done: {} };
+    state = Object.assign(freshState(), state.streakCounted ? { streakCounted: true } : {});
     saveQuests(quests);
     saveState(state);
-    totalCount = quests.reduce((n, b) => n + b.items.filter(i => i.type !== "protegida").length, 0);
-    menuBackdrop.classList.remove("show");
+    closeBackdrop(menuBackdrop);
     render();
+    showToast("Actividades borradas", undoTo(snap));
   });
 
   document.getElementById("restoreDefaultBtn").addEventListener("click", () => {
     const ok = confirm("Esto reemplaza tus actividades actuales con la rutina original de ejemplo. ¿Continuar?");
     if (!ok) return;
-    quests = JSON.parse(JSON.stringify(DEFAULT_QUESTS));
+    const snap = takeSnapshot();
+    quests = defaultQuests();
     saveQuests(quests);
-    totalCount = quests.reduce((n, b) => n + b.items.filter(i => i.type !== "protegida").length, 0);
-    menuBackdrop.classList.remove("show");
+    closeBackdrop(menuBackdrop);
     render();
+    showToast("Rutina de ejemplo restaurada", undoTo(snap));
   });
 
   // Completion message on finishing the day
@@ -1893,6 +2558,8 @@
       "Tu yo de mañana te lo va a agradecer.",
       "Pequeñas victorias, grandes resultados.",
       "Hoy elegiste disciplina. Eso cuenta.",
+      "La motivación te hace empezar; el hábito te hace seguir.",
+      "Un día más votando por la persona que quieres ser.",
     ],
     curioso: [
       "Dato curioso: el corazón humano late unas 100,000 veces al día.",
@@ -1900,6 +2567,7 @@
       "Dato curioso: el plátano es primo botánico de la hierba, no de un árbol.",
       "Dato curioso: el cuerpo humano tiene más de 600 músculos.",
       "Dato curioso: dormir bien mejora la memoria casi tanto como estudiar.",
+      "Dato curioso: caminar 10 minutos después de comer ayuda a controlar el azúcar en sangre.",
     ],
     chiste: [
       "¿Por qué el huevo no se estresa? Porque siempre tiene la yema bajo control.",
@@ -1909,7 +2577,6 @@
       "¿Por qué el reloj del gym siempre tiene hambre? Porque marca las horas pico.",
     ],
   };
-  const COMPLETE_PREFS_KEY = "quest-log-complete-prefs";
   function loadCompletePrefs() {
     const raw = safeGet(COMPLETE_PREFS_KEY);
     if (!raw) return ["motivadora", "curioso", "chiste"]; // default: all on
@@ -1939,11 +2606,22 @@
     safeSet(SOUND_PREF_KEY, prefSoundBox.checked ? "on" : "off");
   });
 
-  function maybeShowCompletion(allDoneNow) {
-    const flagKey = "quest-log-complete-shown";
+  const prefLateDayBox = document.getElementById("prefLateDay");
+  prefLateDayBox.checked = dayStartOffsetMinutes() > 0;
+  prefLateDayBox.addEventListener("change", () => {
+    flushDayNote();
+    safeSet(DAY_START_KEY, prefLateDayBox.checked ? "5" : "0");
+    // keep today's marks: switching the cutoff shouldn't archive or wipe the day in progress
+    state.date = todayKey();
+    saveState(state);
+    refreshDayUI();
+    render();
+  });
+
+  function maybeShowCompletion(allDoneNow, streak) {
     if (!allDoneNow) return;
-    if (safeGet(flagKey) === todayKey()) return;
-    safeSet(flagKey, todayKey());
+    if (safeGet(COMPLETE_SHOWN_KEY) === todayKey()) return;
+    safeSet(COMPLETE_SHOWN_KEY, todayKey());
     beep(660, 90, 0.05);
     setTimeout(() => beep(880, 130, 0.05), 110);
     hapticCelebrate();
@@ -1953,75 +2631,62 @@
     const pool = PHRASES[category] || [];
     if (pool.length === 0) return;
     const phrase = pool[Math.floor(Math.random() * pool.length)];
-    document.getElementById("completeText").textContent = phrase;
-    document.getElementById("completeBackdrop").classList.add("show");
+    const streakLine = streak > 1 ? `\n\n🔥 Llevas ${streak} días seguidos.` : "";
+    document.getElementById("completeText").textContent = phrase + streakLine;
+    openBackdrop(document.getElementById("completeBackdrop"));
   }
-  document.getElementById("completeClose").addEventListener("click", () => {
-    document.getElementById("completeBackdrop").classList.remove("show");
-  });
 
   // Weekly summary — shown once, automatically, each Sunday
   function maybeShowWeeklySummary() {
-    if (new Date().getDay() !== 0) return; // only Sundays
-    const flagKey = "quest-log-weekly-shown";
-    if (safeGet(flagKey) === todayKey()) return; // already shown today
-
-    const history = loadHistory();
-    const map = {};
-    history.forEach(h => { map[h.date] = h; });
-    map[todayKey()] = { done: todayDoneCount, total: todayTotal };
-
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      days.push(localDateKey(d));
-    }
-    let completedDays = 0, trackedDays = 0;
-    days.forEach(key => {
-      const e = map[key];
-      if (e && e.total > 0) {
-        trackedDays++;
-        if (e.done === e.total) completedDays++;
-      }
-    });
-    const streak = parseInt(safeGet(STREAK_KEY) || "0", 10) || 0;
-
+    if (todayDow() !== 0) return; // only Sundays
+    if (safeGet(WEEKLY_SHOWN_KEY) === todayKey()) return; // already shown today
+    const map = dayMap();
+    const w = windowStats(map, 7);
+    if (w.tracked === 0) return;
+    const streak = currentStreak();
     document.getElementById("weeklyText").textContent =
-      `Completaste todas tus actividades en ${completedDays} de ${trackedDays || 7} días esta semana. Tu racha actual es de ${streak} día${streak === 1 ? "" : "s"} seguidos.`;
-    document.getElementById("weeklyBackdrop").classList.add("show");
-    safeSet(flagKey, todayKey());
+      `Completaste todas tus actividades en ${w.perfect} de ${w.tracked} días registrados esta semana, con un promedio de ${w.avg}%.\n\n` +
+      `Tu racha actual es de ${streak} día${streak === 1 ? "" : "s"} seguido${streak === 1 ? "" : "s"}.`;
+    openBackdrop(document.getElementById("weeklyBackdrop"));
+    safeSet(WEEKLY_SHOWN_KEY, todayKey());
   }
-  document.getElementById("weeklyClose").addEventListener("click", () => {
-    document.getElementById("weeklyBackdrop").classList.remove("show");
-  });
 
-  // Daily notes
-  const NOTES_KEY = "quest-log-notes";
-  function loadNotes() {
-    const raw = safeGet(NOTES_KEY);
-    if (!raw) return {};
-    try { return JSON.parse(raw); } catch (e) { return {}; }
-  }
-  function saveNotes(n) { safeSet(NOTES_KEY, JSON.stringify(n)); }
-  const dayNoteField = document.getElementById("dayNoteField");
-  dayNoteField.value = (loadNotes()[todayKey()] || "");
-  let noteSaveTimer = null;
-  dayNoteField.addEventListener("input", () => {
+  // Daily notes — saved to the day being shown, even if the clock crosses midnight mid-typing
+  const noteSavedEl = document.getElementById("noteSaved");
+  let noteSaveTimer = null, notePending = null, noteSavedTimer = null;
+  function flushDayNote() {
     clearTimeout(noteSaveTimer);
-    noteSaveTimer = setTimeout(() => {
-      const notes = loadNotes();
-      const text = dayNoteField.value.trim();
-      if (text) notes[todayKey()] = text; else delete notes[todayKey()];
-      // keep roughly a year of notes
-      const keys = Object.keys(notes).sort();
-      while (keys.length > 370) delete notes[keys.shift()];
-      saveNotes(notes);
-    }, 500);
+    if (!notePending) return;
+    const { key, text } = notePending;
+    notePending = null;
+    const notes = loadNotes();
+    if (text) notes[key] = text; else delete notes[key];
+    // keep roughly a year of notes
+    const keys = Object.keys(notes).sort();
+    while (keys.length > 370) delete notes[keys.shift()];
+    saveNotes(notes);
+    renderHistory();
+    renderCalendar();
+    noteSavedEl.classList.add("show");
+    clearTimeout(noteSavedTimer);
+    noteSavedTimer = setTimeout(() => noteSavedEl.classList.remove("show"), 1200);
+  }
+  dayNoteField.addEventListener("input", () => {
+    notePending = { key: state.date, text: dayNoteField.value.trim() };
+    clearTimeout(noteSaveTimer);
+    noteSaveTimer = setTimeout(flushDayNote, 500);
   });
+  dayNoteField.addEventListener("blur", flushDayNote);
 
+  refreshDayUI();
   render();
   maybeShowWeeklySummary();
+
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
+  }
 })();
 </script>
 </body>
